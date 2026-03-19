@@ -275,7 +275,7 @@ export async function deleteSession(sessionId: string, supabaseClient?: Supabase
   try {
     const { data: files } = await supabase.storage
       .from("video-storage")
-      .list(sessionPath, { recursive: true });
+      .list(sessionPath);
 
     if (files && files.length > 0) {
       const filePaths = files.map((file) => `${sessionPath}/${file.name}`);

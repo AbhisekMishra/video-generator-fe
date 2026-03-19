@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserSessions } from "@/lib/session";
 import { createClient } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/sessions
  * Get all sessions for the current user

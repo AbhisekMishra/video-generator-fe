@@ -3,6 +3,8 @@ import { getPublicUrl } from "@/lib/supabase";
 import { supabase, STORAGE_BUCKET } from "@/lib/supabase";
 import { createClient } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user

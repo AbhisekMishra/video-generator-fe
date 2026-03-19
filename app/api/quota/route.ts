@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { getUserQuota } from "@/lib/quota";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(_request: NextRequest) {
   const supabase = createClient();
   const {

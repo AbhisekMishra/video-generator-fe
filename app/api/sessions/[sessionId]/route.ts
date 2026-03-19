@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, deleteSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/sessions/[sessionId]
  * Get session details including full state from checkpoint

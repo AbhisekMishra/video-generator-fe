@@ -103,15 +103,15 @@ export default function DashboardPage() {
       <main className="container mx-auto px-4 py-8 max-w-7xl flex-1">
         {/* Page header */}
         <div className="flex items-center justify-between mb-8 gap-4">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight">My Videos</h1>
+          <div className="min-w-0 flex flex-col justify-center">
+            <h1 className="text-2xl font-bold tracking-tight leading-tight">My Videos</h1>
             {videoGroups.length > 0 && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-1 leading-tight">
                 {videoGroups.length} video{videoGroups.length !== 1 ? "s" : ""} · {sessions.filter((s) => s.status === "completed").flatMap((s) => s.clip_paths ?? []).length} clips generated
               </p>
             )}
           </div>
-          <Button asChild size="sm" className="flex-shrink-0">
+          <Button asChild className="flex-shrink-0 h-9 px-4 text-sm">
             <Link href="/?new=1">
               <Upload className="w-3.5 h-3.5 mr-1.5" />
               Upload New
@@ -152,7 +152,7 @@ export default function DashboardPage() {
 
         {/* Video groups */}
         {!isLoading && videoGroups.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="flex flex-col gap-6">
             {videoGroups.map((group) => (
               <SessionGroupCard
                 key={group[0].original_video_path}

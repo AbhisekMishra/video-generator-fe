@@ -1,13 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ClipCard } from "@/components/clip-card";
 import { StatusBadge } from "@/components/status-badge";
@@ -188,65 +182,52 @@ export function SessionGroupCard({
 
   return (
     <>
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Video className="w-4 h-4 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <CardTitle className="text-base truncate">
-                  {rootSession.original_filename ?? "Untitled video"}
-                </CardTitle>
-                <CardDescription className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span>Uploaded {uploadedAt}</span>
-                  {sessions.length > 1 && (
-                    <>
-                      <span>·</span>
-                      <span>{sessions.length} generation runs</span>
-                    </>
-                  )}
-                  {allClipUrls.length > 0 && (
-                    <>
-                      <span>·</span>
-                      <span>{allClipUrls.length} clip{allClipUrls.length !== 1 ? "s" : ""}</span>
-                    </>
-                  )}
-                </CardDescription>
-              </div>
+      <Card className="shadow-sm border overflow-hidden">
+        {/* ── Header ─────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b bg-white">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Video className="w-4 h-4 text-primary" />
             </div>
-            <StatusBadge
-              status={activeSession ? activeSession.status : (latestCompletedSession?.status ?? rootSession.status)}
-              className="flex-shrink-0"
-            />
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-5">
-          {/* Original video player */}
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-              Original Video
-            </p>
-            <div className="rounded-lg overflow-hidden border bg-black aspect-video">
-              <video
-                src={rootSession.original_video_url}
-                controls
-                className="w-full h-full object-contain"
-                preload="metadata"
-              />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate leading-tight">
+                {rootSession.original_filename ?? "Untitled video"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Uploaded {uploadedAt}
+                {allClipUrls.length > 0 && ` · ${allClipUrls.length} clip${allClipUrls.length !== 1 ? "s" : ""} generated`}
+                {sessions.length > 1 && ` · ${sessions.length} runs`}
+              </p>
             </div>
           </div>
+          <StatusBadge
+            status={activeSession ? activeSession.status : (latestCompletedSession?.status ?? rootSession.status)}
+            className="flex-shrink-0"
+          />
+        </div>
 
-          {/* Generated clips grid */}
+        {/* ── Original video — full width, capped height ──────────── */}
+        <div className="w-full bg-black border-b flex items-center justify-center" style={{ maxHeight: 260 }}>
+          <video
+            src={rootSession.original_video_url}
+            controls
+            className="w-full object-contain"
+            preload="metadata"
+            style={{ maxHeight: 260 }}
+          />
+        </div>
+
+        {/* ── Clips + footer ───────────────────────────────────────── */}
+        <div className="p-5 space-y-5">
+
+          {/* Clips grid */}
           {allClipUrls.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1.5">
+              <p className="text-xs font-medium text-muted-foreground mb-4 uppercase tracking-wide flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3" />
                 Generated Clips
               </p>
-              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {allClipUrls.map((url, i) => (
                   <ClipCard key={url} clipUrl={url} index={i} globalIndex={i} />
                 ))}
@@ -264,7 +245,7 @@ export function SessionGroupCard({
             </div>
           )}
 
-          {/* Error state */}
+          {/* Error */}
           {regenError && (
             <p className="text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
               {regenError}
@@ -272,30 +253,29 @@ export function SessionGroupCard({
           )}
 
           {/* Footer actions */}
-          <div className="flex items-center justify-between pt-1 border-t gap-2">
+          <div className="flex items-center justify-between pt-4 border-t gap-2">
             <Button
               variant="ghost"
               size="sm"
-              className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 text-xs"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 text-xs h-8"
               onClick={handleDelete}
               disabled={isRegenerating}
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />
               Delete
             </Button>
-
             <Button
               size="sm"
               variant="outline"
               onClick={() => setShowRegenerateDialog(true)}
               disabled={!canRegenerate}
-              className="text-xs"
+              className="text-xs h-8"
             >
               <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
               Generate More Clips
             </Button>
           </div>
-        </CardContent>
+        </div>
       </Card>
 
       <RegenerateDialog

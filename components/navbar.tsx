@@ -37,20 +37,25 @@ export function Navbar({ onSignInClick }: NavbarProps) {
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between max-w-7xl">
-        {/* Left side — hamburger (authenticated) or logo */}
-        <div className="flex items-center gap-3">
+      <div className="container mx-auto px-4 h-14 flex items-center justify-between max-w-7xl">
+
+        {/* Left: hamburger (when signed in) + logo */}
+        <div className="flex items-center gap-2">
           {!authLoading && user && (
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="Open menu">
+                <Button
+                  variant="ghost"
+                  aria-label="Open menu"
+                  className="w-[44px] h-[44px] p-0 flex items-center justify-center flex-shrink-0"
+                >
                   <Menu className="w-5 h-5" />
                 </Button>
               </SheetTrigger>
 
-              <SheetContent side="left" className="w-72 p-0">
-                {/* Drawer header — user info */}
-                <SheetHeader className="border-b px-5 py-5">
+              {/* Sheet renders in a portal — naturally above the navbar */}
+              <SheetContent side="left" className="w-72 p-0 flex flex-col">
+                <SheetHeader className="border-b px-5 py-5 flex-shrink-0">
                   <SheetTitle className="sr-only">Navigation</SheetTitle>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -63,7 +68,6 @@ export function Navbar({ onSignInClick }: NavbarProps) {
                   </div>
                 </SheetHeader>
 
-                {/* Nav links */}
                 <div className="flex flex-col gap-1 px-3 py-4 flex-1">
                   {navLinks.map(({ href, label, icon: Icon, match }) => {
                     const active = pathname === match;
@@ -85,8 +89,7 @@ export function Navbar({ onSignInClick }: NavbarProps) {
                   })}
                 </div>
 
-                {/* Sign out at bottom */}
-                <div className="border-t px-3 py-4">
+                <div className="border-t px-3 py-4 flex-shrink-0">
                   <button
                     onClick={() => signOut()}
                     className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"
@@ -104,7 +107,7 @@ export function Navbar({ onSignInClick }: NavbarProps) {
           </Link>
         </div>
 
-        {/* Right side */}
+        {/* Right */}
         <div className="flex items-center gap-2">
           {!authLoading && !user && (
             <Button size="sm" onClick={onSignInClick}>

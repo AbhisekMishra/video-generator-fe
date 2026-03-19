@@ -23,8 +23,9 @@ export function ClipCard({ clipUrl, index, duration, globalIndex }: ClipCardProp
   };
 
   return (
-    <div className="group rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow">
-      <div className="aspect-[9/16] bg-black relative">
+    <div className="group flex flex-col rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow h-full">
+      {/* Video thumbnail */}
+      <div className="aspect-[9/16] bg-black flex-shrink-0">
         <video
           src={clipUrl}
           controls
@@ -35,7 +36,8 @@ export function ClipCard({ clipUrl, index, duration, globalIndex }: ClipCardProp
         </video>
       </div>
 
-      <div className="p-3 space-y-2.5">
+      {/* Label + download — flex-col so button always sticks to bottom */}
+      <div className="flex flex-col flex-1 p-3 gap-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
             Clip {label}
@@ -50,7 +52,7 @@ export function ClipCard({ clipUrl, index, duration, globalIndex }: ClipCardProp
         <Button
           variant="outline"
           size="sm"
-          className="w-full h-8 text-xs"
+          className="w-full h-8 text-xs mt-auto"
           onClick={handleDownload}
         >
           <Download className="w-3.5 h-3.5 mr-1.5" />

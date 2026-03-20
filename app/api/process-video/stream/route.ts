@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         }, supabaseClient);
 
         // Step 1: Start the workflow in FastAPI backend
-        console.log('📤 Calling FastAPI /process-video endpoint...');
+        console.log('📤 Calling FastAPI /process-video endpoint...', BACKEND_URL);
         const startResponse = await fetch(`${BACKEND_URL}/process-video`, {
           method: "POST",
           headers: {

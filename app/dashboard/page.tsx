@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
@@ -10,6 +10,8 @@ import { Sparkles, Upload, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthModal } from "@/components/auth-modal";
 import type { Session } from "@/lib/session";
+
+const POLL_INTERVAL_MS = 5000;
 
 /** Group a flat list of sessions by original_video_path */
 function groupByVideo(sessions: Session[]): Session[][] {
@@ -32,9 +34,10 @@ export default function DashboardPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchSessions = useCallback(async () => {
-    setIsLoading(true);
+  const fetchSessions = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     setFetchError(null);
     try {
       const res = await fetch("/api/sessions");
@@ -42,27 +45,45 @@ export default function DashboardPage() {
       const { sessions: data } = await res.json();
       const list: Session[] = data ?? [];
       if (list.length === 0) {
-        // No videos yet — send user to upload page
         router.replace("/");
         return;
       }
       setSessions(list);
+      return list;
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Failed to load videos");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [router]);
+
+  // Poll while any session is still processing/pending
+  const schedulePoll = useCallback((list: Session[]) => {
+    const hasInProgress = list.some(
+      (s) => s.status === "processing" || s.status === "pending"
+    );
+    if (!hasInProgress) return;
+
+    pollTimerRef.current = setTimeout(async () => {
+      const updated = await fetchSessions(true);
+      if (updated) schedulePoll(updated);
+    }, POLL_INTERVAL_MS);
+  }, [fetchSessions]);
 
   useEffect(() => {
     if (!authLoading) {
       if (user) {
-        fetchSessions();
+        fetchSessions().then((list) => {
+          if (list) schedulePoll(list);
+        });
       } else {
         setIsLoading(false);
       }
     }
-  }, [user, authLoading, fetchSessions]);
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, [user, authLoading, fetchSessions, schedulePoll]);
 
   const handleDelete = useCallback(async (sessionId: string) => {
     // Optimistically remove all sessions for the same video path
@@ -144,7 +165,7 @@ export default function DashboardPage() {
         {fetchError && (
           <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
             <p className="text-sm text-destructive">{fetchError}</p>
-            <Button variant="outline" size="sm" onClick={fetchSessions}>
+            <Button variant="outline" size="sm" onClick={() => fetchSessions().then((l) => { if (l) schedulePoll(l); })}>
               Try again
             </Button>
           </div>

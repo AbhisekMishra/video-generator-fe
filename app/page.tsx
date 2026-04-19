@@ -174,7 +174,6 @@ function HomeContent() {
     setIsProcessing(true);
     setError(null);
     setCurrentStage("transcribe");
-    setProcessedVideos([]);
 
     try {
       const response = await fetch("/api/process-video/stream", {
@@ -193,66 +192,18 @@ function HomeContent() {
         setError(data.error);
         setIsProcessing(false);
         setCurrentStage(undefined);
-        // Refresh quota so UI reflects exhausted state
         fetch("/api/quota").then((r) => r.json()).then(({ quota: q }) => setQuota(q)).catch(() => {});
+        return;
+      }
+
+      if (response.status === 202) {
+        // Processing accepted — redirect to dashboard to track progress
+        router.push("/dashboard");
         return;
       }
 
       if (!response.ok) {
         throw new Error("Processing failed");
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error("No response stream");
-      }
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = JSON.parse(line.slice(6));
-
-            if (data.status === "completed") {
-              if (data.state?.renderedVideos) {
-                setProcessedVideos(data.state.renderedVideos);
-              }
-              setCurrentStage("completed");
-              setIsProcessing(false);
-              break;
-            }
-
-            if (data.node) {
-              const nodeStageMap: Record<string, WorkflowStage> = {
-                transcribe: "transcribe",
-                identifyClips: "identifyClips",
-                detectFocus: "detectFocus",
-                render: "render",
-              };
-
-              const stage = nodeStageMap[data.node];
-              if (stage) {
-                setCurrentStage(stage);
-              }
-
-              if (data.node === "render" && data.state?.renderedVideos) {
-                setProcessedVideos(data.state.renderedVideos);
-                setCurrentStage("completed");
-              }
-            }
-
-            if (data.error) {
-              throw new Error(data.error);
-            }
-          }
-        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Processing failed");

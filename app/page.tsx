@@ -8,7 +8,7 @@ import { VideoPlayer } from "@/components/video-player";
 import { Button } from "@/components/ui/button";
 import { ButtonWithProgress } from "@/components/button-with-progress";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Sparkles, AlertCircle, Upload, Mic, Scissors, Clapperboard, ArrowRight } from "lucide-react";
+import { Sparkles, AlertCircle, Upload, Mic, Scissors, Clapperboard, ArrowRight, Youtube, Link } from "lucide-react";
 import Image from "next/image";
 import { RenderedVideo } from "@/lib/types";
 import { createSession } from "@/lib/session";
@@ -18,6 +18,9 @@ import { Navbar } from "@/components/navbar";
 import { UserQuota } from "@/lib/quota";
 
 type WorkflowStage = "transcribe" | "identifyClips" | "detectFocus" | "render" | "completed";
+type InputMode = "file" | "youtube";
+
+const YOUTUBE_PATTERN = /(youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/live\/)/;
 
 function HomeContent() {
   const { user, loading: authLoading } = useAuth();
@@ -48,6 +51,11 @@ function HomeContent() {
       })
       .catch(() => {/* stay on upload page on error */});
   }, [user, authLoading, router, searchParams]);
+  const [inputMode, setInputMode] = useState<InputMode>("file");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubeError, setYoutubeError] = useState<string | null>(null);
+  const [isYoutubeLoading, setIsYoutubeLoading] = useState(false);
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadedFileData, setUploadedFileData] = useState<{
     publicUrl: string;
@@ -168,6 +176,48 @@ function HomeContent() {
     }
   };
 
+  const handleYoutubeSubmit = async () => {
+    if (!youtubeUrl.trim()) return;
+
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    if (!YOUTUBE_PATTERN.test(youtubeUrl)) {
+      setYoutubeError("Please enter a valid YouTube URL (youtube.com/watch, youtu.be, or youtube.com/shorts)");
+      return;
+    }
+
+    setIsYoutubeLoading(true);
+    setYoutubeError(null);
+
+    try {
+      const res = await fetch("/api/upload/youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: youtubeUrl.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to process YouTube URL");
+      }
+
+      setUploadedFileData({
+        publicUrl: data.publicUrl,
+        filePath: youtubeUrl.trim(),
+        sessionId: data.sessionId,
+        threadId: data.threadId,
+      });
+    } catch (err) {
+      setYoutubeError(err instanceof Error ? err.message : "Failed to process YouTube URL");
+    } finally {
+      setIsYoutubeLoading(false);
+    }
+  };
+
   const handleProcess = async () => {
     if (!uploadedFileData) return;
 
@@ -222,6 +272,9 @@ function HomeContent() {
     setError(null);
     setUploadProgress(0);
     setUploadStatus("idle");
+    setYoutubeUrl("");
+    setYoutubeError(null);
+    setIsYoutubeLoading(false);
   };
 
   return (
@@ -280,9 +333,9 @@ function HomeContent() {
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <CardTitle>Upload Video</CardTitle>
+                    <CardTitle>Add Video</CardTitle>
                     <CardDescription>
-                      Select a video file to generate short-form clips
+                      Upload a file or paste a YouTube link
                     </CardDescription>
                   </div>
                   {user && quota && (
@@ -297,39 +350,116 @@ function HomeContent() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <VideoUploadDropzone
-                  onVideoSelect={handleVideoSelect}
-                  disabled={isUploading || isProcessing}
-                  uploadProgress={uploadProgress}
-                  uploadStatus={uploadStatus}
-                />
-
-                {selectedFile && !uploadedFileData && !isProcessing && (
-                  <div className="flex gap-2">
-                    <ButtonWithProgress
-                      onClick={handleUpload}
-                      disabled={isUploading}
-                      className="flex-1"
-                      size="lg"
-                      progress={uploadProgress}
-                      showProgress={isUploading}
+                {/* Input mode tabs */}
+                {!uploadedFileData && !isProcessing && (
+                  <div className="flex rounded-lg border overflow-hidden">
+                    <button
+                      onClick={() => { setInputMode("file"); setYoutubeError(null); }}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors ${
+                        inputMode === "file"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background text-muted-foreground hover:bg-muted"
+                      }`}
                     >
-                      <Upload className="w-4 h-4 mr-2" />
-                      {isUploading ? "Uploading..." : "Upload Video"}
-                    </ButtonWithProgress>
-                    <Button
-                      onClick={handleReset}
-                      variant="outline"
-                      size="lg"
-                      disabled={isUploading}
+                      <Upload className="w-3.5 h-3.5" />
+                      Upload File
+                    </button>
+                    <button
+                      onClick={() => { setInputMode("youtube"); setUploadStatus("idle"); }}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors ${
+                        inputMode === "youtube"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background text-muted-foreground hover:bg-muted"
+                      }`}
                     >
-                      Reset
-                    </Button>
+                      <Youtube className="w-3.5 h-3.5" />
+                      YouTube URL
+                    </button>
                   </div>
                 )}
 
+                {/* File upload */}
+                {inputMode === "file" && (
+                  <>
+                    <VideoUploadDropzone
+                      onVideoSelect={handleVideoSelect}
+                      disabled={isUploading || isProcessing}
+                      uploadProgress={uploadProgress}
+                      uploadStatus={uploadStatus}
+                    />
+
+                    {selectedFile && !uploadedFileData && !isProcessing && (
+                      <div className="flex gap-2">
+                        <ButtonWithProgress
+                          onClick={handleUpload}
+                          disabled={isUploading}
+                          className="flex-1"
+                          size="lg"
+                          progress={uploadProgress}
+                          showProgress={isUploading}
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          {isUploading ? "Uploading..." : "Upload Video"}
+                        </ButtonWithProgress>
+                        <Button
+                          onClick={handleReset}
+                          variant="outline"
+                          size="lg"
+                          disabled={isUploading}
+                        >
+                          Reset
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* YouTube URL input */}
+                {inputMode === "youtube" && !uploadedFileData && !isProcessing && (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <input
+                          type="url"
+                          placeholder="https://youtube.com/watch?v=..."
+                          value={youtubeUrl}
+                          onChange={(e) => { setYoutubeUrl(e.target.value); setYoutubeError(null); }}
+                          onKeyDown={(e) => e.key === "Enter" && handleYoutubeSubmit()}
+                          disabled={isYoutubeLoading}
+                          className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50"
+                        />
+                      </div>
+                      <Button
+                        onClick={handleYoutubeSubmit}
+                        disabled={isYoutubeLoading || !youtubeUrl.trim()}
+                        size="default"
+                      >
+                        {isYoutubeLoading ? "Loading..." : "Use Video"}
+                      </Button>
+                    </div>
+                    {youtubeError && (
+                      <p className="text-xs text-destructive flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        {youtubeError}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Supports youtube.com/watch, youtu.be, and youtube.com/shorts links.
+                      The video will be downloaded on the server when processing starts.
+                    </p>
+                  </div>
+                )}
+
+                {/* Ready to process — shown for both file and YouTube modes */}
                 {uploadedFileData && !isProcessing && (
                   <>
+                    {inputMode === "youtube" && (
+                      <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg text-sm">
+                        <Youtube className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <span className="truncate text-muted-foreground">{uploadedFileData.publicUrl}</span>
+                      </div>
+                    )}
                     {quota && quota.attempts_used >= quota.attempts_limit ? (
                       <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-400">
                         You&apos;ve used all {quota.attempts_limit} free attempts. Upgrade to Pro for unlimited clips.

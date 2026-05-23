@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { VideoUploadDropzone } from "@/components/video-upload-dropzone";
 import { WorkflowProgress } from "@/components/workflow-progress";
@@ -331,8 +332,13 @@ function HomeContent() {
                 {uploadedFileData && !isProcessing && (
                   <>
                     {quota && quota.attempts_used >= quota.attempts_limit ? (
-                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-400">
-                        You&apos;ve used all {quota.attempts_limit} free attempts. Upgrade to Pro for unlimited clips.
+                      <div className="flex items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-950/30 dark:border-amber-800">
+                        <p className="text-sm text-amber-800 dark:text-amber-400">
+                          You&apos;ve used all {quota.attempts_limit} {quota.plan_tier === "free" ? "free " : ""}attempts this month.
+                        </p>
+                        <Button asChild size="sm" className="flex-shrink-0">
+                          <Link href="/pricing">Upgrade</Link>
+                        </Button>
                       </div>
                     ) : (
                       <div className="flex gap-2">

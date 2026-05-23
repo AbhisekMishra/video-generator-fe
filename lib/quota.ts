@@ -1,9 +1,12 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 
+export type PlanTier = "free" | "starter" | "pro" | "enterprise";
+
 export interface UserQuota {
-  plan_tier: string;
+  plan_tier: PlanTier;
   attempts_used: number;
   attempts_limit: number;
+  stripe_customer_id?: string | null;
 }
 
 export async function getUserQuota(

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { sessionId, threadId, videoUrl, filePath, existingClips } = body;
+  const { sessionId, threadId, videoUrl, existingClips } = body;
 
   if (!sessionId || !threadId) {
     return NextResponse.json(
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check quota
+  // Read-only quota pre-check — fast-fail before hitting FastAPI
   const { data: quota } = await supabase
     .from("user_quotas")
     .select("attempts_used, attempts_limit, plan_tier")
@@ -56,27 +56,14 @@ export async function POST(request: NextRequest) {
   if (!quota || quota.attempts_used >= quota.attempts_limit) {
     return NextResponse.json(
       {
-        error: `You have used all ${quota?.attempts_limit ?? 3} free attempts. Upgrade to continue.`,
+        error: `You have used all ${quota?.attempts_limit ?? 3} attempts. Upgrade to continue.`,
         upgradeRequired: true,
       },
       { status: 402 }
     );
   }
 
-  // Atomically increment quota before dispatching
-  const { error: incrementError } = await supabase.rpc("increment_user_attempts", {
-    p_user_id: user.id,
-  });
-
-  if (incrementError) {
-    console.error("❌ Failed to increment quota:", incrementError);
-    return NextResponse.json(
-      { error: "Quota check failed. Please try again.", upgradeRequired: true },
-      { status: 402 }
-    );
-  }
-
-  // Dispatch to FastAPI — fire and forget, backend processes async
+  // Dispatch to FastAPI — quota increment is enforced atomically inside FastAPI
   try {
     await updateSessionProgress(
       sessionId,
@@ -91,9 +78,20 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         video_url: videoUrl,
         session_id: sessionId,
+        user_id: user.id,
         existing_clips: existingClips ?? [],
       }),
     });
+
+    // Forward 402 from FastAPI (quota exceeded enforced at backend)
+    if (startResponse.status === 402) {
+      const errorData = await startResponse.json().catch(() => ({}));
+      await failSession(sessionId, errorData.detail || "Quota exceeded", "unknown", supabase).catch(() => {});
+      return NextResponse.json(
+        { error: errorData.detail || "Quota exceeded. Upgrade to continue.", upgradeRequired: true },
+        { status: 402 }
+      );
+    }
 
     if (!startResponse.ok) {
       const errorData = await startResponse.json().catch(() => ({}));

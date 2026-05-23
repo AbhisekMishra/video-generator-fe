@@ -12,9 +12,7 @@ import {
   Menu,
   CreditCard,
   Zap,
-  UserPlus,
 } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -25,7 +23,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/auth-context";
-import { InviteUserModal } from "@/components/invite-user-modal";
 
 interface NavbarProps {
   onSignInClick?: () => void;
@@ -35,7 +32,6 @@ export function Navbar({ onSignInClick }: NavbarProps) {
   const { user, signOut, loading: authLoading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const [inviteOpen, setInviteOpen] = useState(false);
 
   const navLinks = [
     { href: "/?new=1", label: "Upload Video", icon: Video, match: "/" },
@@ -52,7 +48,6 @@ export function Navbar({ onSignInClick }: NavbarProps) {
   };
 
   return (
-    <>
     <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container mx-auto px-4 h-14 flex items-center justify-between max-w-7xl">
 
@@ -70,7 +65,6 @@ export function Navbar({ onSignInClick }: NavbarProps) {
                 </Button>
               </SheetTrigger>
 
-              {/* Sheet renders in a portal — naturally above the navbar */}
               <SheetContent side="left" className="w-72 p-0 flex flex-col">
                 <SheetHeader className="border-b px-5 py-5 flex-shrink-0">
                   <SheetTitle className="sr-only">Navigation</SheetTitle>
@@ -107,15 +101,6 @@ export function Navbar({ onSignInClick }: NavbarProps) {
                 </div>
 
                 <div className="border-t px-3 py-4 flex-shrink-0 flex flex-col gap-1">
-                  <SheetClose asChild>
-                    <button
-                      onClick={() => setInviteOpen(true)}
-                      className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    >
-                      <UserPlus className="w-4 h-4 flex-shrink-0" />
-                      Invite User
-                    </button>
-                  </SheetClose>
                   <SheetClose asChild>
                     <button
                       onClick={handleBillingPortal}
@@ -156,8 +141,5 @@ export function Navbar({ onSignInClick }: NavbarProps) {
         </div>
       </div>
     </nav>
-
-    <InviteUserModal open={inviteOpen} onOpenChange={setInviteOpen} />
-    </>
   );
 }

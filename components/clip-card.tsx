@@ -1,6 +1,6 @@
 "use client";
 
-import { Download } from "lucide-react";
+import { Clapperboard, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ClipCardProps {
@@ -58,6 +58,23 @@ export function ClipCard({ clipUrl, index, duration, globalIndex }: ClipCardProp
           <Download className="w-3.5 h-3.5 mr-1.5" />
           Download MP4
         </Button>
+      </div>
+    </div>
+  );
+}
+
+export function ClipCardSkeleton({ index }: { index: number }) {
+  return (
+    <div className="flex flex-col rounded-xl border bg-card overflow-hidden h-full">
+      <div className="aspect-[9/16] bg-muted flex-shrink-0 flex items-center justify-center animate-pulse">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground/30">
+          <Clapperboard className="w-8 h-8" />
+          <span className="text-xs font-medium">Clip {index + 1}</span>
+        </div>
+      </div>
+      <div className="flex flex-col flex-1 p-3 gap-2">
+        <div className="h-5 w-14 bg-muted rounded-full animate-pulse" />
+        <div className="h-8 bg-muted rounded-md mt-auto animate-pulse" />
       </div>
     </div>
   );

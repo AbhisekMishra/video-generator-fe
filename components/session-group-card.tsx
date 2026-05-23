@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ClipCard } from "@/components/clip-card";
+import { ClipCard, ClipCardSkeleton } from "@/components/clip-card";
 import { StatusBadge } from "@/components/status-badge";
 import { RegenerateDialog } from "@/components/regenerate-dialog";
 import { WorkflowProgress } from "@/components/workflow-progress";
@@ -68,6 +68,12 @@ export function SessionGroupCard({
   const latestCompletedSession = [...sessions]
     .reverse()
     .find((s) => s.status === "completed");
+
+  const processingSession = liveSession ?? activeSession;
+  const skeletonCount =
+    processingSession?.clips_metadata?.length ||
+    processingSession?.total_clips ||
+    3;
 
   const canRegenerate =
     !isRegenerating &&
@@ -258,13 +264,23 @@ export function SessionGroupCard({
             </div>
           )}
 
-          {/* In-progress regeneration */}
-          {isRegenerating && liveStage && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                Generating New Clips…
-              </p>
-              <WorkflowProgress currentStage={liveStage} />
+          {/* Skeleton placeholders while generating */}
+          {!!activeSession && (
+            <div className="space-y-4">
+              {isRegenerating && liveStage && (
+                <WorkflowProgress currentStage={liveStage} />
+              )}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-4 uppercase tracking-wide flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3" />
+                  {allClipUrls.length > 0 ? "Generating New Clips…" : "Generating Clips…"}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {Array.from({ length: skeletonCount }).map((_, i) => (
+                    <ClipCardSkeleton key={i} index={i} />
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

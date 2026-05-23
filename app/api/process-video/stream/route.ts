@@ -76,35 +76,51 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Dispatch to FastAPI — fire and forget, backend processes async
+  // Enqueue the job — backend queues it and returns position
   try {
     await updateSessionProgress(
       sessionId,
-      { status: "processing", current_stage: "transcribe", progress: 10 },
+      { status: "queued", current_stage: null, progress: 0 },
       supabase
     );
 
-    console.log(`🚀 Dispatching video processing for session: ${sessionId}`);
+    console.log(`🚀 Enqueuing video processing for session: ${sessionId}`);
     const startResponse = await fetch(`${BACKEND_URL}/process-video`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         video_url: videoUrl,
         session_id: sessionId,
+        user_id: user.id,
         existing_clips: existingClips ?? [],
       }),
     });
+
+    if (startResponse.status === 429) {
+      // User already has an active job — revert session status
+      await updateSessionProgress(sessionId, { status: "pending" }, supabase).catch(() => {});
+      const errorData = await startResponse.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.detail || "You already have a job in progress. Please wait." },
+        { status: 429 }
+      );
+    }
 
     if (!startResponse.ok) {
       const errorData = await startResponse.json().catch(() => ({}));
       throw new Error(errorData.detail || startResponse.statusText);
     }
 
-    console.log(`✅ Processing accepted by backend for session: ${sessionId}`);
-    return NextResponse.json({ message: "Processing started", sessionId }, { status: 202 });
+    const { queue_position, estimated_wait_seconds } = await startResponse.json();
+    console.log(`✅ Job queued at position ${queue_position} for session: ${sessionId}`);
+
+    return NextResponse.json(
+      { message: "Job queued", sessionId, queue_position, estimated_wait_seconds },
+      { status: 202 }
+    );
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
-    console.error("❌ Failed to dispatch processing:", errorMsg);
+    console.error("❌ Failed to enqueue processing:", errorMsg);
 
     await failSession(sessionId, errorMsg, "unknown", supabase).catch(() => {});
     return NextResponse.json({ error: errorMsg }, { status: 500 });

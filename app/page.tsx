@@ -87,6 +87,11 @@ function HomeContent() {
       return;
     }
 
+    if (quota && quota.attempts_used >= quota.attempts_limit) {
+      setError(`You have used all ${quota.attempts_limit} free attempts. Upgrade to continue.`);
+      return;
+    }
+
     setIsUploading(true);
     setError(null);
     setUploadStatus("uploading");
@@ -186,6 +191,11 @@ function HomeContent() {
 
     if (!YOUTUBE_PATTERN.test(youtubeUrl)) {
       setYoutubeError("Please enter a valid YouTube URL (youtube.com/watch, youtu.be, or youtube.com/shorts)");
+      return;
+    }
+
+    if (quota && quota.attempts_used >= quota.attempts_limit) {
+      setYoutubeError(`You have used all ${quota.attempts_limit} free attempts. Upgrade to continue.`);
       return;
     }
 

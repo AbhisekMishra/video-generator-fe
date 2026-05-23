@@ -21,6 +21,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Block submission if quota is exhausted
+  const { data: quota } = await supabase
+    .from("user_quotas")
+    .select("attempts_used, attempts_limit")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!quota || quota.attempts_used >= quota.attempts_limit) {
+    return NextResponse.json(
+      {
+        error: `You have used all ${quota?.attempts_limit ?? 3} free attempts. Upgrade to continue.`,
+        upgradeRequired: true,
+      },
+      { status: 402 }
+    );
+  }
+
   const { url } = await request.json();
 
   if (!url || typeof url !== "string") {

@@ -11,6 +11,11 @@ const config: Record<Session["status"], { label: string; classes: string; dot?: 
     label: "Pending",
     classes: "bg-muted text-muted-foreground",
   },
+  queued: {
+    label: "Queued",
+    classes: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    dot: true,
+  },
   processing: {
     label: "Processing",
     classes: "bg-blue-500/10 text-blue-600 dark:text-blue-400",

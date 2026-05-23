@@ -27,6 +27,11 @@ function groupByVideo(sessions: Session[]): Session[][] {
     .sort((a, b) => b[0].created_at.localeCompare(a[0].created_at));
 }
 
+interface QueueInfo {
+  queue_position: number;
+  estimated_wait_seconds: number;
+}
+
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -34,6 +39,7 @@ export default function DashboardPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [queuePositions, setQueuePositions] = useState<Record<string, QueueInfo>>({});
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchSessions = useCallback(async (silent = false) => {
@@ -57,24 +63,59 @@ export default function DashboardPage() {
     }
   }, [router]);
 
-  // Poll while any session is still processing/pending
-  const schedulePoll = useCallback((list: Session[]) => {
-    const hasInProgress = list.some(
-      (s) => s.status === "processing" || s.status === "pending"
-    );
-    if (!hasInProgress) return;
+  const fetchQueuePositions = useCallback(async (list: Session[]) => {
+    const queuedSessions = list.filter((s) => s.status === "queued");
+    if (queuedSessions.length === 0) return;
 
-    pollTimerRef.current = setTimeout(async () => {
-      const updated = await fetchSessions(true);
-      if (updated) schedulePoll(updated);
-    }, POLL_INTERVAL_MS);
-  }, [fetchSessions]);
+    const results = await Promise.allSettled(
+      queuedSessions.map((s) =>
+        fetch(`/api/queue-position/${s.id}`)
+          .then((r) => r.json())
+          .then((data) => ({ id: s.id, data }))
+      )
+    );
+
+    setQueuePositions((prev) => {
+      const next = { ...prev };
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value.data?.queue_position) {
+          next[r.value.id] = {
+            queue_position: r.value.data.queue_position,
+            estimated_wait_seconds: r.value.data.estimated_wait_seconds ?? 0,
+          };
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  // Poll while any session is still queued/processing/pending
+  const schedulePoll = useCallback(
+    (list: Session[]) => {
+      const hasInProgress = list.some(
+        (s) => s.status === "queued" || s.status === "processing" || s.status === "pending"
+      );
+      if (!hasInProgress) return;
+
+      pollTimerRef.current = setTimeout(async () => {
+        const updated = await fetchSessions(true);
+        if (updated) {
+          await fetchQueuePositions(updated);
+          schedulePoll(updated);
+        }
+      }, POLL_INTERVAL_MS);
+    },
+    [fetchSessions, fetchQueuePositions]
+  );
 
   useEffect(() => {
     if (!authLoading) {
       if (user) {
         fetchSessions().then((list) => {
-          if (list) schedulePoll(list);
+          if (list) {
+            fetchQueuePositions(list);
+            schedulePoll(list);
+          }
         });
       } else {
         setIsLoading(false);
@@ -83,7 +124,7 @@ export default function DashboardPage() {
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
-  }, [user, authLoading, fetchSessions, schedulePoll]);
+  }, [user, authLoading, fetchSessions, fetchQueuePositions, schedulePoll]);
 
   const handleDelete = useCallback(async (sessionId: string) => {
     // Optimistically remove all sessions for the same video path
@@ -174,14 +215,20 @@ export default function DashboardPage() {
         {/* Video groups */}
         {!isLoading && videoGroups.length > 0 && (
           <div className="flex flex-col gap-6">
-            {videoGroups.map((group) => (
+            {videoGroups.map((group) => {
+              const queuedSession = group.find((s) => s.status === "queued");
+              const queueInfo = queuedSession ? queuePositions[queuedSession.id] : undefined;
+              return (
               <SessionGroupCard
                 key={group[0].original_video_path}
                 sessions={group}
                 onDelete={handleDelete}
                 onRegenerateComplete={handleRegenerateComplete}
+                queuePosition={queueInfo?.queue_position}
+                estimatedWaitSeconds={queueInfo?.estimated_wait_seconds}
               />
-            ))}
+            );
+            })}
           </div>
         )}
       </main>

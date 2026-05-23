@@ -23,6 +23,9 @@ interface SessionGroupCardProps {
   sessions: Session[];
   onDelete: (sessionId: string) => void;
   onRegenerateComplete: (newSession: Session) => void;
+  /** Queue position for any queued session in this group (1-indexed) */
+  queuePosition?: number;
+  estimatedWaitSeconds?: number;
 }
 
 type WorkflowStage = "transcribe" | "identifyClips" | "detectFocus" | "render" | "completed";
@@ -39,6 +42,8 @@ export function SessionGroupCard({
   sessions,
   onDelete,
   onRegenerateComplete,
+  queuePosition,
+  estimatedWaitSeconds,
 }: SessionGroupCardProps) {
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -59,10 +64,12 @@ export function SessionGroupCard({
     (s) => s.clips_metadata ?? []
   );
 
-  // Determine if any session is currently processing
+  // Determine if any session is currently queued or processing
   const activeSession =
     liveSession ??
-    sessions.find((s) => s.status === "processing" || s.status === "pending") ??
+    sessions.find(
+      (s) => s.status === "queued" || s.status === "processing" || s.status === "pending"
+    ) ??
     null;
 
   const latestCompletedSession = [...sessions]
@@ -264,8 +271,16 @@ export function SessionGroupCard({
             </div>
           )}
 
-          {/* Skeleton placeholders while generating */}
-          {!!activeSession && (
+          {/* Queued state — show position banner, no skeletons yet */}
+          {!!activeSession && activeSession.status === "queued" && !isRegenerating && (
+            <WorkflowProgress
+              queuePosition={queuePosition}
+              estimatedWaitSeconds={estimatedWaitSeconds}
+            />
+          )}
+
+          {/* Skeleton placeholders while processing */}
+          {!!activeSession && activeSession.status !== "queued" && (
             <div className="space-y-4">
               {isRegenerating && liveStage && (
                 <WorkflowProgress currentStage={liveStage} />

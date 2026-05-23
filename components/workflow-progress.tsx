@@ -2,13 +2,17 @@
 
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mic, Scissors, Target, Clapperboard, Check } from "lucide-react";
+import { Mic, Scissors, Target, Clapperboard, Check, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type WorkflowStage = "transcribe" | "identifyClips" | "detectFocus" | "render" | "completed";
 
 interface WorkflowProgressProps {
   currentStage?: WorkflowStage;
+  /** When set, shows a queue-position banner instead of workflow stages */
+  queuePosition?: number;
+  /** Estimated wait in seconds, shown alongside queue position */
+  estimatedWaitSeconds?: number;
   className?: string;
 }
 
@@ -47,6 +51,8 @@ const stages = [
 
 export function WorkflowProgress({
   currentStage,
+  queuePosition,
+  estimatedWaitSeconds,
   className,
 }: WorkflowProgressProps) {
   const currentStageIndex = currentStage
@@ -56,6 +62,40 @@ export function WorkflowProgress({
   const progressValue = currentStage
     ? stages.find((s) => s.id === currentStage)?.progress || 0
     : 0;
+
+  const estimatedMinutes = estimatedWaitSeconds
+    ? Math.max(1, Math.round(estimatedWaitSeconds / 60))
+    : null;
+
+  if (queuePosition !== undefined && queuePosition > 0) {
+    return (
+      <Card className={cn("shadow-sm", className)}>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Waiting in queue...</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4 p-4 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-800">
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500/20 flex-shrink-0">
+              <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm text-amber-800 dark:text-amber-300">
+                You&apos;re #{queuePosition} in queue
+              </p>
+              {estimatedMinutes && (
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                  Estimated wait: ~{estimatedMinutes} min
+                </p>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Your video will start processing automatically when it reaches the front of the queue.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className={cn("shadow-sm", className)}>

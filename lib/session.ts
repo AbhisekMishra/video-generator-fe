@@ -17,7 +17,7 @@ export interface Session {
   original_filename: string | null;
   original_file_size: number | null;
   original_duration: number | null;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: "pending" | "queued" | "processing" | "completed" | "failed";
   current_stage: string | null;
   progress: number;
   thread_id: string;
@@ -92,7 +92,7 @@ export async function updateSessionProgress(
   sessionId: string,
   updates: {
     status?: Session["status"];
-    current_stage?: string;
+    current_stage?: string | null;
     progress?: number;
     total_clips?: number;
     completed_clips?: number;

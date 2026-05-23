@@ -10,6 +10,14 @@ import { WorkflowProgress } from "@/components/workflow-progress";
 import { Trash2, RefreshCw, Video, Sparkles } from "lucide-react";
 import type { Session, ClipMetadata } from "@/lib/session";
 
+const YOUTUBE_PATTERN =
+  /(?:youtube\.com\/(?:watch\?.*v=|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+
+function extractYoutubeId(url: string): string | null {
+  const match = url.match(YOUTUBE_PATTERN);
+  return match ? match[1] : null;
+}
+
 interface SessionGroupCardProps {
   /** All sessions for this video (same original_video_path), sorted by created_at ascending */
   sessions: Session[];
@@ -208,13 +216,28 @@ export function SessionGroupCard({
 
         {/* ── Original video — full width, capped height ──────────── */}
         <div className="w-full bg-black border-b flex items-center justify-center" style={{ maxHeight: 260 }}>
-          <video
-            src={rootSession.original_video_url}
-            controls
-            className="w-full object-contain"
-            preload="metadata"
-            style={{ maxHeight: 260 }}
-          />
+          {(() => {
+            const youtubeId = rootSession.original_video_url
+              ? extractYoutubeId(rootSession.original_video_url)
+              : null;
+            return youtubeId ? (
+              <iframe
+                src={`https://www.youtube.com/embed/${youtubeId}`}
+                className="w-full"
+                style={{ height: 260 }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <video
+                src={rootSession.original_video_url}
+                controls
+                className="w-full object-contain"
+                preload="metadata"
+                style={{ maxHeight: 260 }}
+              />
+            );
+          })()}
         </div>
 
         {/* ── Clips + footer ───────────────────────────────────────── */}

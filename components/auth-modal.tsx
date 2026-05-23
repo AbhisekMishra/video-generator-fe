@@ -58,7 +58,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           setError(error.message);
         } else {
           setSuccessMessage(
-            "Account created! Please check your email to confirm your account."
+            "Account created! You can now sign in."
           );
           // Clear form
           setEmail("");

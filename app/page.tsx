@@ -72,11 +72,28 @@ function HomeContent() {
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
 
   const handleVideoSelect = (file: File) => {
-    setSelectedFile(file);
+    setSelectedFile(null);
     setUploadedFileData(null);
     setError(null);
     setUploadProgress(0);
     setUploadStatus("idle");
+
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      if (video.duration > 0 && video.duration < 20) {
+        setError(`Video is too short (${Math.round(video.duration)}s). We need at least 20 seconds of spoken content to generate clips.`);
+        return;
+      }
+      setSelectedFile(file);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      setSelectedFile(file); // let server-side validation catch format issues
+    };
+    video.src = url;
   };
 
   const handleUpload = async () => {

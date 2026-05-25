@@ -7,7 +7,7 @@ import { ClipCard, ClipCardSkeleton } from "@/components/clip-card";
 import { StatusBadge } from "@/components/status-badge";
 import { RegenerateDialog } from "@/components/regenerate-dialog";
 import { WorkflowProgress } from "@/components/workflow-progress";
-import { Trash2, RefreshCw, Video, Sparkles } from "lucide-react";
+import { Trash2, RefreshCw, Video, Sparkles, AlertCircle } from "lucide-react";
 import type { Session, ClipMetadata } from "@/lib/session";
 
 const YOUTUBE_PATTERN =
@@ -29,6 +29,17 @@ interface SessionGroupCardProps {
 }
 
 type WorkflowStage = "transcribe" | "identifyClips" | "detectFocus" | "render" | "completed";
+
+function getTranscriptionErrorMessage(errorMessage: string | null): string {
+  if (!errorMessage) return "Processing failed. Try a different video or check that it contains clear speech.";
+  if (errorMessage.startsWith("video_too_short:")) {
+    const secs = parseFloat(errorMessage.split(":")[1]);
+    return `Your video is only ${secs.toFixed(0)}s long — we need at least 20 seconds of spoken content to find clips.`;
+  }
+  if (errorMessage === "no_audio_track") return "This video has no audio track. Please upload a video with speech.";
+  if (errorMessage === "no_speech_detected") return "We couldn't detect any speech in your video. Make sure it contains clear, audible dialogue.";
+  return "Processing failed. Try a different video or check that it contains clear speech.";
+}
 
 const stageNodeMap: Record<string, WorkflowStage> = {
   transcribe: "transcribe",
@@ -75,6 +86,10 @@ export function SessionGroupCard({
   const latestCompletedSession = [...sessions]
     .reverse()
     .find((s) => s.status === "completed");
+
+  const latestSession = sessions[sessions.length - 1];
+  const latestFailedSession =
+    latestSession?.status === "failed" ? latestSession : null;
 
   const processingSession = liveSession ?? activeSession;
   const skeletonCount =
@@ -267,6 +282,19 @@ export function SessionGroupCard({
                 {allClipUrls.map((url, i) => (
                   <ClipCard key={url} clipUrl={url} index={i} globalIndex={i} />
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Failed state — show contextual error message */}
+          {latestFailedSession && !activeSession && (
+            <div className="flex items-start gap-3 p-4 bg-destructive/5 border border-destructive/20 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-destructive">Processing failed</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {getTranscriptionErrorMessage(latestFailedSession.error_message)}
+                </p>
               </div>
             </div>
           )}

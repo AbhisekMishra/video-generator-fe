@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 
 export const dynamic = "force-dynamic";
 
+const BACKEND_URL = process.env.FASTAPI_URL || "http://localhost:8000";
+
 const YOUTUBE_PATTERN =
   /(youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/live\/)/;
 
@@ -49,6 +51,22 @@ export async function POST(request: NextRequest) {
       { error: "Invalid YouTube URL. Supported formats: youtube.com/watch, youtu.be, youtube.com/shorts" },
       { status: 400 }
     );
+  }
+
+  // Validate video duration before creating a session — keeps quota intact on rejection
+  try {
+    const validateRes = await fetch(`${BACKEND_URL}/validate-youtube`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (!validateRes.ok) {
+      const { detail } = await validateRes.json().catch(() => ({ detail: "Video validation failed." }));
+      return NextResponse.json({ error: detail }, { status: 400 });
+    }
+  } catch {
+    // Backend unreachable — let processing fail naturally rather than blocking the user
+    console.warn("Could not reach backend for YouTube validation, proceeding without duration check.");
   }
 
   const threadId = `session-${uuidv4()}`;

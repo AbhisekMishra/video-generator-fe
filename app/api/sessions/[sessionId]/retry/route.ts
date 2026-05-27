@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 const BACKEND_URL = process.env.FASTAPI_URL || "http://localhost:8000";
+const MAX_RETRIES = parseInt(process.env.MAX_SESSION_RETRIES ?? "3", 10);
 
 export async function POST(
   _request: NextRequest,
@@ -35,8 +36,14 @@ export async function POST(
         { status: 400 }
       );
     }
+    if (session.retry_count >= MAX_RETRIES) {
+      return NextResponse.json(
+        { error: "Max retries reached", maxRetriesReached: true },
+        { status: 429 }
+      );
+    }
 
-    // Reset session to queued state, clearing error fields
+    // Reset session and increment retry_count atomically
     const { error: resetError } = await supabase
       .from("sessions")
       .update({
@@ -45,6 +52,7 @@ export async function POST(
         progress: 0,
         error_message: null,
         error_stage: null,
+        retry_count: session.retry_count + 1,
       })
       .eq("id", sessionId);
 
@@ -66,7 +74,7 @@ export async function POST(
     });
 
     if (backendRes.status === 429) {
-      try { await supabase.from("sessions").update({ status: "failed" }).eq("id", sessionId); } catch {}
+      try { await supabase.from("sessions").update({ status: "failed", retry_count: session.retry_count }).eq("id", sessionId); } catch {}
       const err = await backendRes.json().catch(() => ({}));
       return NextResponse.json(
         { error: err.detail || "You already have a job in progress. Please wait." },
@@ -76,7 +84,7 @@ export async function POST(
 
     if (!backendRes.ok) {
       const err = await backendRes.json().catch(() => ({}));
-      try { await supabase.from("sessions").update({ status: "failed" }).eq("id", sessionId); } catch {}
+      try { await supabase.from("sessions").update({ status: "failed", retry_count: session.retry_count }).eq("id", sessionId); } catch {}
       return NextResponse.json(
         { error: err.detail || "Failed to enqueue retry" },
         { status: 500 }
@@ -84,10 +92,10 @@ export async function POST(
     }
 
     const { queue_position, estimated_wait_seconds } = await backendRes.json();
-    console.log(`♻️  Retry queued for session ${sessionId} at position ${queue_position}`);
+    console.log(`♻️  Retry ${session.retry_count + 1}/${MAX_RETRIES} queued for session ${sessionId} at position ${queue_position}`);
 
     return NextResponse.json(
-      { message: "Retry queued", sessionId, queue_position, estimated_wait_seconds },
+      { message: "Retry queued", sessionId, queue_position, estimated_wait_seconds, retriesRemaining: MAX_RETRIES - (session.retry_count + 1) },
       { status: 202 }
     );
   } catch (error) {

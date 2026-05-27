@@ -28,6 +28,7 @@ export interface Session {
   completed_clips: number;
   error_message: string | null;
   error_stage: string | null;
+  retry_count: number;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

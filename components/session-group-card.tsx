@@ -7,8 +7,11 @@ import { ClipCard, ClipCardSkeleton } from "@/components/clip-card";
 import { StatusBadge } from "@/components/status-badge";
 import { RegenerateDialog } from "@/components/regenerate-dialog";
 import { WorkflowProgress } from "@/components/workflow-progress";
+import Link from "next/link";
 import { Trash2, RefreshCw, Video, Sparkles, AlertCircle } from "lucide-react";
 import type { Session, ClipMetadata } from "@/lib/session";
+
+const MAX_RETRIES = 3;
 
 const YOUTUBE_PATTERN =
   /(?:youtube\.com\/(?:watch\?.*v=|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
@@ -317,19 +320,38 @@ export function SessionGroupCard({
                 <p className="text-sm text-muted-foreground mt-1">
                   {getTranscriptionErrorMessage(latestFailedSession.error_message)}
                 </p>
-                {retryError && (
-                  <p className="text-xs text-destructive mt-1">{retryError}</p>
+                {latestFailedSession.retry_count >= MAX_RETRIES ? (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Max retries reached.{" "}
+                    <Link href="/?new=1" className="underline underline-offset-2 hover:text-foreground">
+                      Re-upload the video
+                    </Link>{" "}
+                    to try again.
+                  </p>
+                ) : (
+                  <>
+                    {retryError && (
+                      <p className="text-xs text-destructive mt-1">{retryError}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleRetry}
+                        disabled={isRetrying}
+                        className="text-xs h-7"
+                      >
+                        <RefreshCw className={`w-3 h-3 mr-1.5 ${isRetrying ? "animate-spin" : ""}`} />
+                        {isRetrying ? "Retrying…" : "Retry"}
+                      </Button>
+                      {latestFailedSession.retry_count > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {latestFailedSession.retry_count}/{MAX_RETRIES} attempts used
+                        </span>
+                      )}
+                    </div>
+                  </>
                 )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleRetry}
-                  disabled={isRetrying}
-                  className="mt-3 text-xs h-7"
-                >
-                  <RefreshCw className={`w-3 h-3 mr-1.5 ${isRetrying ? "animate-spin" : ""}`} />
-                  {isRetrying ? "Retrying…" : "Retry"}
-                </Button>
               </div>
             </div>
           )}

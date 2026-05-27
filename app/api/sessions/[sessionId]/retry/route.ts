@@ -66,11 +66,7 @@ export async function POST(
     });
 
     if (backendRes.status === 429) {
-      await supabase
-        .from("sessions")
-        .update({ status: "failed" })
-        .eq("id", sessionId)
-        .catch(() => {});
+      try { await supabase.from("sessions").update({ status: "failed" }).eq("id", sessionId); } catch {}
       const err = await backendRes.json().catch(() => ({}));
       return NextResponse.json(
         { error: err.detail || "You already have a job in progress. Please wait." },
@@ -80,11 +76,7 @@ export async function POST(
 
     if (!backendRes.ok) {
       const err = await backendRes.json().catch(() => ({}));
-      await supabase
-        .from("sessions")
-        .update({ status: "failed" })
-        .eq("id", sessionId)
-        .catch(() => {});
+      try { await supabase.from("sessions").update({ status: "failed" }).eq("id", sessionId); } catch {}
       return NextResponse.json(
         { error: err.detail || "Failed to enqueue retry" },
         { status: 500 }

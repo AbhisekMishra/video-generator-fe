@@ -23,6 +23,7 @@ interface SessionGroupCardProps {
   sessions: Session[];
   onDelete: (sessionId: string) => void;
   onRegenerateComplete: (newSession: Session) => void;
+  onRetry?: (sessionId: string) => void;
   /** Queue position for any queued session in this group (1-indexed) */
   queuePosition?: number;
   estimatedWaitSeconds?: number;
@@ -53,11 +54,14 @@ export function SessionGroupCard({
   sessions,
   onDelete,
   onRegenerateComplete,
+  onRetry,
   queuePosition,
   estimatedWaitSeconds,
 }: SessionGroupCardProps) {
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const [liveSession, setLiveSession] = useState<Session | null>(null);
   const [liveStage, setLiveStage] = useState<WorkflowStage | undefined>();
   const [regenError, setRegenError] = useState<string | null>(null);
@@ -205,6 +209,24 @@ export function SessionGroupCard({
     }
   }, [rootSession, onRegenerateComplete]);
 
+  const handleRetry = useCallback(async () => {
+    if (!latestFailedSession) return;
+    setIsRetrying(true);
+    setRetryError(null);
+    try {
+      const res = await fetch(`/api/sessions/${latestFailedSession.id}/retry`, { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Retry failed");
+      }
+      onRetry?.(latestFailedSession.id);
+    } catch (err) {
+      setRetryError(err instanceof Error ? err.message : "Retry failed");
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [latestFailedSession, onRetry]);
+
   const handleDelete = async () => {
     // Delete all sessions for this video group (root is sufficient since we group by video path)
     onDelete(rootSession.id);
@@ -286,15 +308,28 @@ export function SessionGroupCard({
             </div>
           )}
 
-          {/* Failed state — show contextual error message */}
+          {/* Failed state — show contextual error message + retry */}
           {latestFailedSession && !activeSession && (
             <div className="flex items-start gap-3 p-4 bg-destructive/5 border border-destructive/20 rounded-lg">
               <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-destructive">Processing failed</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   {getTranscriptionErrorMessage(latestFailedSession.error_message)}
                 </p>
+                {retryError && (
+                  <p className="text-xs text-destructive mt-1">{retryError}</p>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRetry}
+                  disabled={isRetrying}
+                  className="mt-3 text-xs h-7"
+                >
+                  <RefreshCw className={`w-3 h-3 mr-1.5 ${isRetrying ? "animate-spin" : ""}`} />
+                  {isRetrying ? "Retrying…" : "Retry"}
+                </Button>
               </div>
             </div>
           )}

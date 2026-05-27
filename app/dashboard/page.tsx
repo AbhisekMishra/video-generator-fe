@@ -155,6 +155,14 @@ export default function DashboardPage() {
     setSessions((prev) => [...prev, newSession]);
   }, []);
 
+  const handleRetry = useCallback(async (_sessionId: string) => {
+    const updated = await fetchSessions(true);
+    if (updated) {
+      await fetchQueuePositions(updated);
+      schedulePoll(updated);
+    }
+  }, [fetchSessions, fetchQueuePositions, schedulePoll]);
+
   const videoGroups = groupByVideo(sessions);
 
   return (
@@ -224,6 +232,7 @@ export default function DashboardPage() {
                 sessions={group}
                 onDelete={handleDelete}
                 onRegenerateComplete={handleRegenerateComplete}
+                onRetry={handleRetry}
                 queuePosition={queueInfo?.queue_position}
                 estimatedWaitSeconds={queueInfo?.estimated_wait_seconds}
               />

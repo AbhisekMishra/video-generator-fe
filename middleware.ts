@@ -54,7 +54,18 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // /dashboard renders a client-side auth gate, but without this the page shell
+  // and its data fetches still start for unauthenticated requests before that
+  // client check kicks in. Redirect server-side instead.
+  if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
+    const redirectUrl = new URL("/", request.url);
+    redirectUrl.searchParams.set("signin", "1");
+    return NextResponse.redirect(redirectUrl);
+  }
 
   return response;
 }

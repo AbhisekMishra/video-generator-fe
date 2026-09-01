@@ -4,10 +4,9 @@ export const dynamic = "force-dynamic";
 
 import { updateSessionProgress, failSession, getSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase-server";
+import { getBackendUrl, backendHeaders } from "@/lib/backend";
 
 export const maxDuration = 60;
-
-const BACKEND_URL = process.env.FASTAPI_URL || "http://localhost:8000";
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -85,9 +84,9 @@ export async function POST(request: NextRequest) {
     );
 
     console.log(`🚀 Enqueuing video processing for session: ${sessionId}`);
-    const startResponse = await fetch(`${BACKEND_URL}/process-video`, {
+    const startResponse = await fetch(`${getBackendUrl()}/process-video`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: backendHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         video_url: videoUrl,
         session_id: sessionId,

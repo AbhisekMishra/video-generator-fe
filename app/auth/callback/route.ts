@@ -30,5 +30,7 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/error`);
+  // /auth/error was never a real route — this 404'd. Land on the home page with
+  // the sign-in modal open instead so the user can retry.
+  return NextResponse.redirect(`${origin}/?signin=1`);
 }

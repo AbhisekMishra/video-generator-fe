@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase-server";
+import { getBackendUrl, backendHeaders } from "@/lib/backend";
 
 export const dynamic = "force-dynamic";
 
-const BACKEND_URL = process.env.FASTAPI_URL || "http://localhost:8000";
 const MAX_RETRIES = parseInt(process.env.MAX_SESSION_RETRIES ?? "3", 10);
 
 export async function POST(
@@ -62,9 +62,9 @@ export async function POST(
     }
 
     // Enqueue job on the backend — no quota increment for retries
-    const backendRes = await fetch(`${BACKEND_URL}/process-video`, {
+    const backendRes = await fetch(`${getBackendUrl()}/process-video`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: backendHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         video_url: session.original_video_url,
         session_id: sessionId,

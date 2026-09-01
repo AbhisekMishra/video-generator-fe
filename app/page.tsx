@@ -29,6 +29,11 @@ function HomeContent() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [quota, setQuota] = useState<UserQuota | null>(null);
 
+  // Opened by middleware.ts when redirecting an unauthenticated /dashboard visit here
+  useEffect(() => {
+    if (searchParams.get("signin") === "1") setShowAuthModal(true);
+  }, [searchParams]);
+
   // Fetch quota whenever user changes
   useEffect(() => {
     if (!user) { setQuota(null); return; }

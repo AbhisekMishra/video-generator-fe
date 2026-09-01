@@ -41,12 +41,13 @@ export default function DashboardPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [queuePositions, setQueuePositions] = useState<Record<string, QueueInfo>>({});
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchSessions = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch("/api/sessions");
+      const res = await fetch("/api/sessions", { signal: abortControllerRef.current?.signal });
       if (!res.ok) throw new Error("Failed to load videos");
       const { sessions: data } = await res.json();
       const list: Session[] = data ?? [];
@@ -57,6 +58,7 @@ export default function DashboardPage() {
       setSessions(list);
       return list;
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setFetchError(err instanceof Error ? err.message : "Failed to load videos");
     } finally {
       if (!silent) setIsLoading(false);
@@ -69,7 +71,7 @@ export default function DashboardPage() {
 
     const results = await Promise.allSettled(
       queuedSessions.map((s) =>
-        fetch(`/api/queue-position/${s.id}`)
+        fetch(`/api/queue-position/${s.id}`, { signal: abortControllerRef.current?.signal })
           .then((r) => r.json())
           .then((data) => ({ id: s.id, data }))
       )
@@ -95,6 +97,7 @@ export default function DashboardPage() {
       const hasInProgress = list.some(
         (s) => s.status === "queued" || s.status === "processing" || s.status === "pending"
       );
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       if (!hasInProgress) return;
 
       pollTimerRef.current = setTimeout(async () => {
@@ -109,6 +112,8 @@ export default function DashboardPage() {
   );
 
   useEffect(() => {
+    abortControllerRef.current = new AbortController();
+
     if (!authLoading) {
       if (user) {
         fetchSessions().then((list) => {
@@ -123,6 +128,7 @@ export default function DashboardPage() {
     }
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      abortControllerRef.current?.abort();
     };
   }, [user, authLoading, fetchSessions, fetchQueuePositions, schedulePoll]);
 
@@ -152,8 +158,14 @@ export default function DashboardPage() {
   }, [sessions, fetchSessions]);
 
   const handleRegenerateComplete = useCallback((newSession: Session) => {
-    setSessions((prev) => [...prev, newSession]);
-  }, []);
+    setSessions((prev) => {
+      const next = [...prev, newSession];
+      // Resume polling — the group's previous sessions may all have been
+      // completed/failed already, so the poll loop could otherwise be idle.
+      schedulePoll(next);
+      return next;
+    });
+  }, [schedulePoll]);
 
   const handleRetry = useCallback(async (_sessionId: string) => {
     const updated = await fetchSessions(true);

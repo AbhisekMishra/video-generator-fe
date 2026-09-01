@@ -13,13 +13,20 @@ interface ClipCardProps {
 export function ClipCard({ clipUrl, index, duration, globalIndex }: ClipCardProps) {
   const label = globalIndex !== undefined ? globalIndex + 1 : index + 1;
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    // clipUrl is a cross-origin Supabase Storage URL — the `download` attribute
+    // on a plain <a> is ignored cross-origin by most browsers, so fetch the file
+    // as a blob and download that instead.
+    const response = await fetch(clipUrl);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = clipUrl;
+    link.href = blobUrl;
     link.download = `clip-${label}.mp4`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
   };
 
   return (

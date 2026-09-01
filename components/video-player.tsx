@@ -14,13 +14,20 @@ export function VideoPlayer({ videos }: VideoPlayerProps) {
     return null;
   }
 
-  const handleDownload = (videoUrl: string, clipIndex: number) => {
+  const handleDownload = async (videoUrl: string, clipIndex: number) => {
+    // videoUrl is a cross-origin Supabase Storage URL — the `download` attribute
+    // on a plain <a> is ignored cross-origin by most browsers, so fetch the file
+    // as a blob and download that instead.
+    const response = await fetch(videoUrl);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = videoUrl;
+    link.href = blobUrl;
     link.download = `clip-${clipIndex + 1}.mp4`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
   };
 
   return (

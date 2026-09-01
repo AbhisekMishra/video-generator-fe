@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LogOut,
   User,
@@ -10,7 +10,6 @@ import {
   LayoutDashboard,
   Video,
   Menu,
-  CreditCard,
   Zap,
   UserPlus,
 } from "lucide-react";
@@ -34,7 +33,6 @@ interface NavbarProps {
 export function Navbar({ onSignInClick }: NavbarProps) {
   const { user, signOut, loading: authLoading } = useAuth();
   const pathname = usePathname();
-  const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const navLinks = [
@@ -42,14 +40,6 @@ export function Navbar({ onSignInClick }: NavbarProps) {
     { href: "/dashboard", label: "My Videos", icon: LayoutDashboard, match: "/dashboard" },
     { href: "/pricing", label: "Pricing", icon: Zap, match: "/pricing" },
   ];
-
-  const handleBillingPortal = async () => {
-    const res = await fetch("/api/billing/portal", { method: "POST" });
-    if (res.ok) {
-      const { url } = await res.json();
-      router.push(url);
-    }
-  };
 
   return (
     <>
@@ -116,15 +106,7 @@ export function Navbar({ onSignInClick }: NavbarProps) {
                       Invite User
                     </button>
                   </SheetClose>
-                  <SheetClose asChild>
-                    <button
-                      onClick={handleBillingPortal}
-                      className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    >
-                      <CreditCard className="w-4 h-4 flex-shrink-0" />
-                      Manage Billing
-                    </button>
-                  </SheetClose>
+                  {/* Billing portal isn't implemented yet (no Stripe routes exist) — hidden until it is */}
                   <button
                     onClick={() => signOut()}
                     className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"

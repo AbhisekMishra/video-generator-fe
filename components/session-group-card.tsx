@@ -45,14 +45,6 @@ function getTranscriptionErrorMessage(errorMessage: string | null): string {
   return "Processing failed. Try a different video or check that it contains clear speech.";
 }
 
-const stageNodeMap: Record<string, WorkflowStage> = {
-  transcribe: "transcribe",
-  identifyClips: "identifyClips",
-  detectFocus: "detectFocus",
-  render: "render",
-  completed: "completed",
-};
-
 export function SessionGroupCard({
   sessions,
   onDelete,
@@ -149,61 +141,25 @@ export function SessionGroupCard({
       setLiveSession(optimisticSession);
       setLiveStage("transcribe");
 
-      // Step 2: Start processing stream
+      // Step 2: Enqueue processing. This endpoint returns a single JSON response
+      // (202 once the job is queued) — it does not stream progress. Progress is
+      // picked up by the dashboard's normal session polling once we hand the
+      // optimistic session off via onRegenerateComplete below.
       const streamRes = await fetch("/api/process-video/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, threadId, videoUrl, filePath, existingClips }),
       });
 
-      if (!streamRes.ok) throw new Error("Processing stream failed to start");
-
-      const reader = streamRes.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) throw new Error("No response stream");
-
-      // Step 3: Read SSE events
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const data = JSON.parse(line.slice(6));
-
-          if (data.status === "completed") {
-            const completedSession: Session = {
-              ...optimisticSession,
-              status: "completed",
-              current_stage: "completed",
-              progress: 100,
-              clip_paths: (data.state?.renderedVideos ?? []).map((v: any) => v.url),
-              clips_metadata: (data.state?.renderedVideos ?? [])
-                .filter((v: any) => v.clip)
-                .map((v: any) => ({
-                  start: v.clip.start,
-                  end: v.clip.end,
-                  title: v.clip.title ?? null,
-                  score: v.clip.score ?? 0,
-                })),
-              completed_at: new Date().toISOString(),
-            };
-            setLiveSession(null);
-            setLiveStage(undefined);
-            onRegenerateComplete(completedSession);
-            setIsRegenerating(false);
-            return;
-          }
-
-          if (data.node) {
-            const stage = stageNodeMap[data.node];
-            if (stage) setLiveStage(stage);
-          }
-
-          if (data.error) throw new Error(data.error);
-        }
+      if (!streamRes.ok) {
+        const err = await streamRes.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to start processing");
       }
+
+      setLiveSession(null);
+      setLiveStage(undefined);
+      onRegenerateComplete(optimisticSession);
+      setIsRegenerating(false);
     } catch (err) {
       setRegenError(err instanceof Error ? err.message : "Regeneration failed");
       setLiveSession(null);

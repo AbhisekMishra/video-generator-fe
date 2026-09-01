@@ -50,13 +50,6 @@ export async function createSession(
   const supabase = supabaseClient || browserClient;
   const threadId = `session-${uuidv4()}`;
 
-  console.log('📝 Attempting to create session:', {
-    userId: params.userId,
-    filename: params.filename,
-    threadId: threadId,
-    usingClient: supabaseClient ? 'server' : 'browser'
-  });
-
   const { data, error } = await supabase
     .from("sessions")
     .insert({
@@ -73,16 +66,10 @@ export async function createSession(
     .single();
 
   if (error) {
-    console.error('❌ Supabase error creating session:', {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint
-    });
+    console.error('❌ Supabase error creating session:', error.message);
     throw new Error(`Failed to create session: ${error.message}`);
   }
 
-  console.log('✅ Session created in database:', data.id);
   return data as Session;
 }
 
@@ -181,7 +168,6 @@ export async function failSession(
  */
 export async function getSession(sessionId: string, supabaseClient?: SupabaseClient): Promise<Session | null> {
   const supabase = supabaseClient || browserClient;
-  console.log('🔍 Getting session with ID:', sessionId, 'using client:', supabaseClient ? 'server' : 'browser');
 
   const { data, error } = await supabase
     .from("sessions")
@@ -189,20 +175,9 @@ export async function getSession(sessionId: string, supabaseClient?: SupabaseCli
     .eq("id", sessionId)
     .single();
 
-  console.log('📊 Query result:', {
-    found: !!data,
-    data,
-    error: error ? {
-      code: error.code,
-      message: error.message,
-      details: error.details
-    } : null
-  });
-
   if (error) {
     if (error.code === "PGRST116") {
       // Row not found
-      console.log('⚠️ Session not found in database, might be RLS blocking or wrong ID');
       return null;
     }
     throw new Error(`Failed to get session: ${error.message}`);

@@ -9,17 +9,19 @@ npm run dev      # Start development server on http://localhost:3000
 npm run build    # Production build
 npm run start    # Start production server
 npm run lint     # ESLint via Next.js
+npm test         # Run the Vitest suite (lib/__tests__/)
 ```
 
-There is no test framework configured. `scripts/test-db-connection.js` is a standalone Supabase connectivity check, not a test suite.
+Vitest covers pure logic in `lib/` only (`cn()`, quota helpers, `lib/backend.ts`'s env-var handling) — no component/route tests yet. CI (`.github/workflows/ci.yml`) runs typecheck, tests, and build on every push/PR. `test-db-connection.js` (repo root) is a standalone Supabase connectivity check, not part of the test suite.
 
 ## Architecture
 
 This is a **Next.js 14 (App Router) SaaS frontend** for an AI video-to-clips tool. Users upload a long video (or provide a YouTube URL), it gets processed by a FastAPI backend running a LangGraph AI workflow, and the result is a set of short 9:16 clips with captions.
 
-**Backend dependency**: The FastAPI backend must be running at `FASTAPI_URL` (default `http://localhost:8000`). The frontend only calls two backend endpoints:
+**Backend dependency**: The FastAPI backend must be running at `FASTAPI_URL` (default `http://localhost:8000`). Every call to it requires the `X-Internal-Api-Key` header (`FASTAPI_INTERNAL_API_KEY` env var) — the backend rejects requests without it. The frontend calls:
 - `POST /process-video` — enqueue video for processing
 - `POST /validate-youtube` — check duration before creating a session
+- `GET /process-video/queue-position/{session_id}` — poll queue position
 
 **Infrastructure stack**: Supabase (auth + PostgreSQL + Storage), Stripe (billing), FastAPI backend.
 
@@ -67,12 +69,14 @@ Quota is enforced at two points: upload URL generation and processing enqueue. T
 
 ```
 FASTAPI_URL                      # Backend URL (default: http://localhost:8000)
+FASTAPI_INTERNAL_API_KEY         # Shared secret sent as X-Internal-Api-Key on every backend call — must match INTERNAL_API_KEY on the backend
 NEXT_PUBLIC_SUPABASE_URL         # Supabase project URL (exposed to browser)
 NEXT_PUBLIC_SUPABASE_ANON_KEY    # Supabase anon key (exposed to browser)
 SUPABASE_SERVICE_ROLE_KEY        # Secret — server-side API routes only
 DATABASE_URL                     # PostgreSQL connection (LangGraph checkpointing)
-STRIPE_SECRET_KEY                # Stripe billing
-STRIPE_WEBHOOK_SECRET            # Stripe webhook verification
+ADMIN_EMAILS                     # Comma-separated email allowlist permitted to use POST /api/invite
+STRIPE_SECRET_KEY                # Stripe billing — NOT YET IMPLEMENTED, no app/api/billing or app/api/stripe routes exist despite being documented below
+STRIPE_WEBHOOK_SECRET            # Stripe webhook verification — NOT YET IMPLEMENTED
 ```
 
 Copy `.env.example` to `.env.local` for local development.
@@ -101,11 +105,11 @@ app/api/
     [sessionId]/regenerate/    POST  Regenerate clips
   queue-position/[sessionId]/  GET  Queue position from backend
   quota/             GET   User quota info
-  billing/                 Stripe billing portal
-  stripe/                  Stripe webhook handlers
   auth/callback/           OAuth redirect
-  invite/            POST  Invite users
+  invite/            POST  Invite users (requires ADMIN_EMAILS allowlist)
 ```
+
+`billing/` and `stripe/` are NOT implemented — no such routes exist despite being referenced by the navbar's "Manage Billing" button (currently hidden) and `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` env vars. See `TODO.md`.
 
 ## Component Patterns
 

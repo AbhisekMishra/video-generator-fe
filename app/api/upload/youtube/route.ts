@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { v4 as uuidv4 } from "uuid";
+import { getBackendUrl, backendHeaders } from "@/lib/backend";
 
 export const dynamic = "force-dynamic";
-
-const BACKEND_URL = process.env.FASTAPI_URL || "http://localhost:8000";
 
 const YOUTUBE_PATTERN =
   /(youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/live\/)/;
@@ -55,9 +54,9 @@ export async function POST(request: NextRequest) {
 
   // Validate video duration before creating a session — keeps quota intact on rejection
   try {
-    const validateRes = await fetch(`${BACKEND_URL}/validate-youtube`, {
+    const validateRes = await fetch(`${getBackendUrl()}/validate-youtube`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: backendHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ url }),
     });
     if (!validateRes.ok) {

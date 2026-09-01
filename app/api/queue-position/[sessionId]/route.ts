@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { getSession } from "@/lib/session";
+import { getBackendUrl, backendHeaders } from "@/lib/backend";
 
 export const dynamic = "force-dynamic";
 
-const BACKEND_URL = process.env.FASTAPI_URL || "http://localhost:8000";
-
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   const supabase = createClient();
   const {
@@ -18,11 +18,20 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { sessionId } = params;
+  const { sessionId } = await params;
+
+  const session = await getSession(sessionId, supabase);
+  if (!session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+  if (session.user_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     const res = await fetch(
-      `${BACKEND_URL}/process-video/queue-position/${sessionId}`
+      `${getBackendUrl()}/process-video/queue-position/${sessionId}`,
+      { headers: backendHeaders() }
     );
 
     if (res.status === 404) {

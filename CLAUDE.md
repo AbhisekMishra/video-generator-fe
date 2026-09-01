@@ -16,7 +16,7 @@ Vitest covers pure logic in `lib/` only (`cn()`, quota helpers, `lib/backend.ts`
 
 ## Architecture
 
-This is a **Next.js 14 (App Router) SaaS frontend** for an AI video-to-clips tool. Users upload a long video (or provide a YouTube URL), it gets processed by a FastAPI backend running a LangGraph AI workflow, and the result is a set of short 9:16 clips with captions.
+This is a **Next.js 14 (App Router) SaaS frontend** for an AI video-to-clips tool. Users upload a long video (or provide a YouTube URL), it gets processed by a FastAPI backend running a sequential pipeline (transcribe → identify clips via Claude → generate captions → render), and the result is a set of short 9:16 clips with captions.
 
 **Backend dependency**: The FastAPI backend must be running at `FASTAPI_URL` (default `http://localhost:8000`). Every call to it requires the `X-Internal-Api-Key` header (`FASTAPI_INTERNAL_API_KEY` env var) — the backend rejects requests without it. The frontend calls:
 - `POST /process-video` — enqueue video for processing
@@ -55,9 +55,9 @@ Three Supabase clients exist for different contexts:
 - `lib/supabase-admin.ts` — admin client that bypasses RLS (for webhook handlers)
 
 **Key tables:**
-- `sessions` — core table; stores session status, clip paths, metadata, error info
+- `sessions` — core table; stores session status, clip paths, metadata, error info. Also has a `pipeline_state` JSONB column (2026-09) the backend uses to cache each pipeline stage's output (transcript/clips/captions/rendered clips) for crash-resume — see the backend's `CLAUDE.md`.
 - `user_quotas` — `attempts_used` / `attempts_limit` / `plan_tier` per user
-- `checkpoints` — LangGraph state persistence (auto-managed by backend)
+- `checkpoints` — leftover from an earlier LangGraph-based backend; the backend never used a Postgres checkpointer in practice (it ran an in-memory-only checkpointer, since replaced by the plain pipeline above) — this table is very likely unused. Verify before relying on it or dropping it.
 
 **Storage bucket:** `video-storage` (public). Path structure: `sessions/{sessionId}/{original|clips|captions}`.
 
@@ -73,7 +73,7 @@ FASTAPI_INTERNAL_API_KEY         # Shared secret sent as X-Internal-Api-Key on e
 NEXT_PUBLIC_SUPABASE_URL         # Supabase project URL (exposed to browser)
 NEXT_PUBLIC_SUPABASE_ANON_KEY    # Supabase anon key (exposed to browser)
 SUPABASE_SERVICE_ROLE_KEY        # Secret — server-side API routes only
-DATABASE_URL                     # PostgreSQL connection (LangGraph checkpointing)
+DATABASE_URL                     # PostgreSQL connection — not used by any app code path (only test-db-connection.js); likely leftover from an earlier LangGraph checkpointing plan
 ADMIN_EMAILS                     # Comma-separated email allowlist permitted to use POST /api/invite
 STRIPE_SECRET_KEY                # Stripe billing — NOT YET IMPLEMENTED, no app/api/billing or app/api/stripe routes exist despite being documented below
 STRIPE_WEBHOOK_SECRET            # Stripe webhook verification — NOT YET IMPLEMENTED

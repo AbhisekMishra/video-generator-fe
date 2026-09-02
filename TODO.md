@@ -6,12 +6,14 @@ This list is what's left.
 
 ## Needs a product/infra decision first
 
-- [ ] **Stripe billing.** `stripe` is a dependency, `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`
-      are documented env vars, but no `app/api/billing/` or `app/api/stripe/` routes exist.
-      The "Manage Billing" nav button was hidden rather than left silently broken. Needs
-      real Stripe integration (checkout, customer portal, webhook handler with signature
-      verification) or the dependency/docs should be removed if billing isn't happening
-      soon.
+- [x] ~~**Stripe billing.**~~ RESOLVED 2026-09-02, via Lemon Squeezy instead of Stripe —
+      see `CLAUDE.md`'s Quota System section for the full flow (`/pricing`, `/api/checkout`,
+      `/api/webhooks/lemonsqueezy`, `/api/billing-portal`). The `stripe` npm package and
+      `STRIPE_*` env vars are now dead leftovers from the abandoned attempt — safe to
+      remove in a follow-up cleanup, not done as part of this change to keep it focused.
+      Still pending: creating the actual products/variants in the Lemon Squeezy dashboard
+      and setting `LEMONSQUEEZY_*` env vars (the account was under review as of this
+      writing) — the code is ready but unexercised against the real API until then.
 - [ ] **Observability (Sentry or similar).** No error tracking on the frontend. Needs a
       DSN before wiring up `@sentry/nextjs`.
 - [ ] **Signed URLs for Supabase Storage.** The `video-storage` bucket is public — anyone

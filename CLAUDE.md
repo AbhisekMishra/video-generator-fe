@@ -65,6 +65,12 @@ Three Supabase clients exist for different contexts:
 
 Quota is enforced at two points: upload URL generation and processing enqueue. The processing enqueue uses a PostgreSQL RPC to atomically increment `attempts_used`, preventing race conditions. Returns HTTP 402 when quota is exhausted.
 
+**Plan tiers** (2026-09, Lemon Squeezy): `free` (3 lifetime attempts, default on signup), `starter` ($9/mo, 20 attempts, resets monthly), `pro` ($29/mo, 60 attempts, resets monthly) — `lib/lemonsqueezy.ts`'s `PLANS` map is the source of truth for tier→quota; `attempts_limit` per tier lives there, not in the DB. `user_quotas` gained `lemonsqueezy_customer_id`, `lemonsqueezy_subscription_id`, `subscription_status`, `current_period_end` (migration `20260902000000_add_lemonsqueezy_billing.sql`).
+
+**Billing flow**: `/pricing` (new page) → `POST /api/checkout` (creates a Lemon Squeezy checkout via their REST API, embeds the Supabase `user_id` as checkout `custom_data` so the webhook can map back to a user) → user pays on Lemon Squeezy's hosted checkout → `POST /api/webhooks/lemonsqueezy` (signature-verified via `X-Signature` HMAC-SHA256, see `lib/lemonsqueezy.ts`'s `verifyWebhookSignature`) updates `user_quotas` on `subscription_created`/`updated`/`cancelled`/`expired`, and resets `attempts_used` to 0 on `subscription_payment_success` (the monthly renewal reset). `GET /api/billing-portal` looks up the user's `lemonsqueezy_subscription_id` and redirects to Lemon Squeezy's hosted customer portal (manage/cancel/update payment method) — wired to the navbar's "Manage Billing" button.
+
+Stripe (`stripe` npm package, `STRIPE_*` env vars) is unused dead weight from an abandoned earlier attempt — no Stripe code exists anywhere. Not removed yet; safe to delete in a follow-up cleanup.
+
 ## Environment Variables
 
 ```
@@ -75,8 +81,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY    # Supabase anon key (exposed to browser)
 SUPABASE_SERVICE_ROLE_KEY        # Secret — server-side API routes only
 DATABASE_URL                     # PostgreSQL connection — not used by any app code path (only test-db-connection.js); likely leftover from an earlier LangGraph checkpointing plan
 ADMIN_EMAILS                     # Comma-separated email allowlist permitted to use POST /api/invite
-STRIPE_SECRET_KEY                # Stripe billing — NOT YET IMPLEMENTED, no app/api/billing or app/api/stripe routes exist despite being documented below
-STRIPE_WEBHOOK_SECRET            # Stripe webhook verification — NOT YET IMPLEMENTED
+LEMONSQUEEZY_API_KEY             # Bearer token for the Lemon Squeezy REST API (checkouts, subscription lookups)
+LEMONSQUEEZY_STORE_ID            # Your Lemon Squeezy store ID
+LEMONSQUEEZY_WEBHOOK_SECRET      # Signing secret configured on the webhook in the LS dashboard — verifies X-Signature
+LEMONSQUEEZY_STARTER_VARIANT_ID  # Variant ID for the $9/mo Starter subscription product
+LEMONSQUEEZY_PRO_VARIANT_ID      # Variant ID for the $29/mo Pro subscription product
+STRIPE_SECRET_KEY                # Dead — abandoned Stripe attempt, no code uses this
+STRIPE_WEBHOOK_SECRET            # Dead — abandoned Stripe attempt, no code uses this
 ```
 
 Copy `.env.example` to `.env.local` for local development.
@@ -107,9 +118,13 @@ app/api/
   quota/             GET   User quota info
   auth/callback/           OAuth redirect
   invite/            POST  Invite users (requires ADMIN_EMAILS allowlist)
+  checkout/          POST  Create a Lemon Squeezy checkout for a plan
+  billing-portal/    GET   Redirect URL to Lemon Squeezy's hosted customer portal
+  webhooks/
+    lemonsqueezy/    POST  Lemon Squeezy subscription events (signature-verified)
 ```
 
-`billing/` and `stripe/` are NOT implemented — no such routes exist despite being referenced by the navbar's "Manage Billing" button (currently hidden) and `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` env vars. See `TODO.md`.
+Billing is implemented via Lemon Squeezy (2026-09) — see the Quota System section above for the full flow (`/pricing`, `/api/checkout`, `/api/webhooks/lemonsqueezy`, `/api/billing-portal`). The navbar's "Manage Billing" button is wired up. `STRIPE_*` env vars and the `stripe` npm dependency are dead leftovers from an abandoned earlier attempt.
 
 ## Component Patterns
 

@@ -12,7 +12,9 @@ import {
   Menu,
   Zap,
   UserPlus,
+  CreditCard,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +35,27 @@ interface NavbarProps {
 export function Navbar({ onSignInClick }: NavbarProps) {
   const { user, signOut, loading: authLoading } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(false);
+
+  const handleManageBilling = async () => {
+    setBillingLoading(true);
+    try {
+      const res = await fetch("/api/billing-portal");
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      // No active subscription (or lookup failed) — send them to pick a plan instead.
+      router.push("/pricing");
+    } catch {
+      router.push("/pricing");
+    } finally {
+      setBillingLoading(false);
+    }
+  };
 
   const navLinks = [
     { href: "/?new=1", label: "Upload Video", icon: Video, match: "/" },
@@ -106,7 +128,14 @@ export function Navbar({ onSignInClick }: NavbarProps) {
                       Invite User
                     </button>
                   </SheetClose>
-                  {/* Billing portal isn't implemented yet (no Stripe routes exist) — hidden until it is */}
+                  <button
+                    onClick={handleManageBilling}
+                    disabled={billingLoading}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+                  >
+                    <CreditCard className="w-4 h-4 flex-shrink-0" />
+                    {billingLoading ? "Loading..." : "Manage Billing"}
+                  </button>
                   <button
                     onClick={() => signOut()}
                     className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"

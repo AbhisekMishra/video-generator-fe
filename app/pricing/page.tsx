@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { UserQuota } from "@/lib/quota";
+import { PLANS } from "@/lib/lemonsqueezy-plans";
 
 interface PlanCard {
   tier: "free" | "starter" | "pro";
@@ -26,6 +27,9 @@ interface PlanCard {
   highlighted?: boolean;
 }
 
+// price/attemptsLimit for starter & pro come from lib/lemonsqueezy-plans.ts's PLANS — the
+// single source of truth shared with the checkout/webhook routes. Only presentation
+// (marketing copy, feature bullets, which card to highlight) lives here.
 const PLAN_CARDS: PlanCard[] = [
   {
     tier: "free",
@@ -37,19 +41,19 @@ const PLAN_CARDS: PlanCard[] = [
   },
   {
     tier: "starter",
-    name: "Starter",
-    price: "$9",
-    cadence: "/month",
-    attempts: "20 clips/month",
+    name: PLANS.starter.name,
+    price: PLANS.starter.price,
+    cadence: PLANS.starter.cadence,
+    attempts: `${PLANS.starter.attemptsLimit} clips/month`,
     features: ["Everything in Free", "Resets monthly", "Priority queue"],
     highlighted: true,
   },
   {
     tier: "pro",
-    name: "Pro",
-    price: "$29",
-    cadence: "/month",
-    attempts: "60 clips/month",
+    name: PLANS.pro.name,
+    price: PLANS.pro.price,
+    cadence: PLANS.pro.cadence,
+    attempts: `${PLANS.pro.attemptsLimit} clips/month`,
     features: ["Everything in Starter", "Higher monthly volume", "Priority support"],
   },
 ];

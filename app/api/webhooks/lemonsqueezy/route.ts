@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { verifyWebhookSignature, planForVariantId } from "@/lib/lemonsqueezy";
+import { verifyWebhookSignature, planForVariantId } from "@/lib/lemonsqueezy-server";
 
 export const dynamic = "force-dynamic";
 

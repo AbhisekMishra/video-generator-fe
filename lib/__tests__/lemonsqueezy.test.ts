@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { verifyWebhookSignature, planForVariantId, PLANS } from "@/lib/lemonsqueezy";
+import { verifyWebhookSignature, planForVariantId } from "@/lib/lemonsqueezy-server";
 
 const SECRET = "test-webhook-secret";
 
@@ -14,6 +14,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
+  delete process.env.LEMONSQUEEZY_STARTER_VARIANT_ID;
 });
 
 describe("verifyWebhookSignature", () => {
@@ -46,7 +47,7 @@ describe("planForVariantId", () => {
   });
 
   it("finds the matching plan by variant id", () => {
-    PLANS.starter.variantId = "12345";
+    process.env.LEMONSQUEEZY_STARTER_VARIANT_ID = "12345";
     expect(planForVariantId("12345")?.tier).toBe("starter");
   });
 });

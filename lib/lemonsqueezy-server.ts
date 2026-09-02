@@ -1,45 +1,38 @@
 import crypto from "crypto";
+import { PLANS, PlanConfig, PlanTier } from "@/lib/lemonsqueezy-plans";
 
 /**
- * Lemon Squeezy integration — plain REST calls (JSON:API) rather than the official SDK,
- * matching this project's preference for calling a vendor's HTTP API directly instead of
- * pulling in a wrapper for a handful of endpoints (see video-generator-be's move from
- * langchain to the anthropic SDK directly).
+ * Server-only Lemon Squeezy integration — plain REST calls (JSON:API) rather than the
+ * official SDK, matching this project's preference for calling a vendor's HTTP API
+ * directly instead of pulling in a wrapper for a handful of endpoints (see
+ * video-generator-be's move from langchain to the anthropic SDK directly).
+ *
+ * Never import this from a "use client" component — it pulls in `crypto` and reads
+ * secret env vars. Display-only plan data (price, quota) lives in
+ * lib/lemonsqueezy-plans.ts instead, safe for client use.
  */
 
 const LEMONSQUEEZY_API_BASE = "https://api.lemonsqueezy.com/v1";
 
-export type PlanTier = "starter" | "pro";
-
-export interface PlanConfig {
-  tier: PlanTier;
-  variantId: string;
-  attemptsLimit: number;
-  priceLabel: string;
-  name: string;
+/** Tier -> variant ID, read from env on every call (not cached at module load) so
+ * tests can stub env vars per-case and so a runtime env change doesn't need a rebuild
+ * to take effect. Set after creating the corresponding product/variant in the Lemon
+ * Squeezy dashboard. */
+function variantIdsByTier(): Record<PlanTier, string> {
+  return {
+    starter: process.env.LEMONSQUEEZY_STARTER_VARIANT_ID ?? "",
+    pro: process.env.LEMONSQUEEZY_PRO_VARIANT_ID ?? "",
+  };
 }
 
-/** Tier -> {variant, quota} mapping. Variant IDs come from env (set after creating the
- * corresponding product/variant in the Lemon Squeezy dashboard). */
-export const PLANS: Record<PlanTier, PlanConfig> = {
-  starter: {
-    tier: "starter",
-    variantId: process.env.LEMONSQUEEZY_STARTER_VARIANT_ID ?? "",
-    attemptsLimit: 20,
-    priceLabel: "$9/mo",
-    name: "Starter",
-  },
-  pro: {
-    tier: "pro",
-    variantId: process.env.LEMONSQUEEZY_PRO_VARIANT_ID ?? "",
-    attemptsLimit: 60,
-    priceLabel: "$29/mo",
-    name: "Pro",
-  },
-};
+export function variantIdForTier(tier: PlanTier): string {
+  return variantIdsByTier()[tier];
+}
 
-export function planForVariantId(variantId: string): PlanConfig | null {
-  return Object.values(PLANS).find((p) => p.variantId === String(variantId)) ?? null;
+export function planForVariantId(variantId: string): (PlanConfig & { variantId: string }) | null {
+  const ids = variantIdsByTier();
+  const tier = (Object.keys(ids) as PlanTier[]).find((t) => ids[t] === String(variantId));
+  return tier ? { ...PLANS[tier], variantId: ids[tier] } : null;
 }
 
 function requireEnv(name: string): string {

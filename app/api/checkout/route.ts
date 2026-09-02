@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
-import { createCheckout, PLANS, PlanTier } from "@/lib/lemonsqueezy";
+import { PLANS, PlanTier } from "@/lib/lemonsqueezy-plans";
+import { createCheckout, variantIdForTier } from "@/lib/lemonsqueezy-server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "plan must be 'starter' or 'pro'" }, { status: 400 });
   }
 
-  const planConfig = PLANS[plan];
-  if (!planConfig.variantId) {
+  const variantId = variantIdForTier(plan);
+  if (!variantId) {
     return NextResponse.json(
       { error: `${plan} plan is not configured (missing variant ID)` },
       { status: 500 }
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const checkoutUrl = await createCheckout({
-      variantId: planConfig.variantId,
+      variantId,
       userId: user.id,
       email: user.email ?? "",
       redirectUrl: `${request.nextUrl.origin}/dashboard?checkout=success`,

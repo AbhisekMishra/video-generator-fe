@@ -65,7 +65,7 @@ Three Supabase clients exist for different contexts:
 
 Quota is enforced at two points: upload URL generation and processing enqueue. The processing enqueue uses a PostgreSQL RPC to atomically increment `attempts_used`, preventing race conditions. Returns HTTP 402 when quota is exhausted.
 
-**Plan tiers** (2026-09, Lemon Squeezy): `free` (3 lifetime attempts, default on signup), `starter` ($9/mo, 20 attempts, resets monthly), `pro` ($29/mo, 60 attempts, resets monthly) — `lib/lemonsqueezy.ts`'s `PLANS` map is the source of truth for tier→quota; `attempts_limit` per tier lives there, not in the DB. `user_quotas` gained `lemonsqueezy_customer_id`, `lemonsqueezy_subscription_id`, `subscription_status`, `current_period_end` (migration `20260902000000_add_lemonsqueezy_billing.sql`).
+**Plan tiers** (2026-09, Lemon Squeezy, store currency AED): `free` (3 lifetime attempts, default on signup), `starter` (39 AED/mo, 20 attempts, resets monthly), `pro` (109 AED/mo, 60 attempts, resets monthly) — `lib/lemonsqueezy.ts`'s `PLANS` map is the single source of truth for tier→price/quota (also read directly by `app/pricing/page.tsx`, not duplicated there); `attempts_limit` lives there, not in the DB. `user_quotas` gained `lemonsqueezy_customer_id`, `lemonsqueezy_subscription_id`, `subscription_status`, `current_period_end` (migration `20260902000000_add_lemonsqueezy_billing.sql`).
 
 **Billing flow**: `/pricing` (new page) → `POST /api/checkout` (creates a Lemon Squeezy checkout via their REST API, embeds the Supabase `user_id` as checkout `custom_data` so the webhook can map back to a user) → user pays on Lemon Squeezy's hosted checkout → `POST /api/webhooks/lemonsqueezy` (signature-verified via `X-Signature` HMAC-SHA256, see `lib/lemonsqueezy.ts`'s `verifyWebhookSignature`) updates `user_quotas` on `subscription_created`/`updated`/`cancelled`/`expired`, and resets `attempts_used` to 0 on `subscription_payment_success` (the monthly renewal reset). `GET /api/billing-portal` looks up the user's `lemonsqueezy_subscription_id` and redirects to Lemon Squeezy's hosted customer portal (manage/cancel/update payment method) — wired to the navbar's "Manage Billing" button.
 
@@ -84,8 +84,8 @@ ADMIN_EMAILS                     # Comma-separated email allowlist permitted to 
 LEMONSQUEEZY_API_KEY             # Bearer token for the Lemon Squeezy REST API (checkouts, subscription lookups)
 LEMONSQUEEZY_STORE_ID            # Your Lemon Squeezy store ID
 LEMONSQUEEZY_WEBHOOK_SECRET      # Signing secret configured on the webhook in the LS dashboard — verifies X-Signature
-LEMONSQUEEZY_STARTER_VARIANT_ID  # Variant ID for the $9/mo Starter subscription product
-LEMONSQUEEZY_PRO_VARIANT_ID      # Variant ID for the $29/mo Pro subscription product
+LEMONSQUEEZY_STARTER_VARIANT_ID  # Variant ID for the 39 AED/mo Starter subscription product
+LEMONSQUEEZY_PRO_VARIANT_ID      # Variant ID for the 109 AED/mo Pro subscription product
 STRIPE_SECRET_KEY                # Dead — abandoned Stripe attempt, no code uses this
 STRIPE_WEBHOOK_SECRET            # Dead — abandoned Stripe attempt, no code uses this
 ```

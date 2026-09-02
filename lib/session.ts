@@ -271,6 +271,29 @@ export async function deleteSession(sessionId: string, supabaseClient?: Supabase
   if (error) {
     throw new Error(`Failed to delete session: ${error.message}`);
   }
+
+  // The uploaded original lives at the bucket root (see generateVideoFileName in
+  // lib/supabase.ts), not under sessions/{sessionId}/ — the cleanup above never
+  // touched it, so every deleted upload-based session used to leak its source file
+  // forever. Skip YouTube-sourced sessions (original_video_path is the YouTube URL
+  // itself, not a storage path) and skip if a sibling session (from "Generate More
+  // Clips") still references the same original.
+  const isStoragePath = !!session.original_video_path && !session.original_video_path.startsWith("http");
+  if (isStoragePath) {
+    try {
+      const { count } = await supabase
+        .from("sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("original_video_path", session.original_video_path);
+
+      if (!count) {
+        await supabase.storage.from("video-storage").remove([session.original_video_path]);
+      }
+    } catch (error) {
+      console.error("Error deleting original video file:", error);
+      // Non-fatal — the session record is already gone either way.
+    }
+  }
 }
 
 /**

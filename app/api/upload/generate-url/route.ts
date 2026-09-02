@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
+const MAX_UPLOAD_SIZE_BYTES = Number(process.env.MAX_UPLOAD_SIZE_MB ?? "2048") * 1024 * 1024;
+
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user
@@ -36,7 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { fileName, fileType } = await request.json();
+    const { fileName, fileType, fileSize } = await request.json();
 
     if (!fileName) {
       return NextResponse.json(
@@ -50,6 +52,18 @@ export async function POST(request: NextRequest) {
     if (fileType && !allowedTypes.includes(fileType)) {
       return NextResponse.json(
         { error: "Invalid file type. Only MP4, MOV, AVI, and MKV are allowed." },
+        { status: 400 }
+      );
+    }
+
+    // Reject oversized files before we hand out an upload URL — without this, a
+    // multi-GB file uploads in full to Supabase Storage before the backend's
+    // duration cap gets a chance to reject it. The client already checks this too,
+    // but that's bypassable, so it's enforced here as well.
+    if (typeof fileSize === "number" && fileSize > MAX_UPLOAD_SIZE_BYTES) {
+      const limitMb = Math.round(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024));
+      return NextResponse.json(
+        { error: `File is too large. Maximum upload size is ${limitMb} MB.` },
         { status: 400 }
       );
     }

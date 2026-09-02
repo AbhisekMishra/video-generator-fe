@@ -8,9 +8,10 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; needsEmailConfirmation: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  resetPasswordForEmail: (email: string) => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,14 +49,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    return { error };
+    // If email confirmation is required, Supabase returns a user but no session.
+    // If it's disabled, a session comes back immediately and onAuthStateChange
+    // above already picks it up — the caller doesn't need to tell the user to
+    // check their email in that case.
+    const needsEmailConfirmation = !error && !data.session && !!data.user;
+    return { error, needsEmailConfirmation };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -70,6 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const resetPasswordForEmail = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+    });
+    return { error };
+  };
+
   const value = {
     user,
     session,
@@ -77,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signIn,
     signOut,
+    resetPasswordForEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

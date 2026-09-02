@@ -257,6 +257,11 @@ export default function DashboardPage() {
       <footer className="border-t mt-16 py-8">
         <div className="container mx-auto px-4 max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <p>© {new Date().getFullYear()} ClipAI. All rights reserved.</p>
+          <div className="flex gap-4">
+            <Link href="/terms" className="hover:text-foreground">Terms</Link>
+            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link href="/refund" className="hover:text-foreground">Refunds</Link>
+          </div>
         </div>
       </footer>
     </div>

@@ -1,5 +1,10 @@
+const { withSentryConfig } = require("@sentry/nextjs/config");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    instrumentationHook: true,
+  },
   async headers() {
     return [
       {
@@ -15,4 +20,13 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSentryConfig(nextConfig, {
+  silent: true,
+  // No org/project/authToken configured — this only enables Sentry's webpack plugin
+  // for cleaner client-side stack traces (source map handling still works without
+  // upload; add SENTRY_AUTH_TOKEN + org/project later to get uploaded source maps).
+  widenClientFileUpload: true,
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+  },
+});

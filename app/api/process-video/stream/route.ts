@@ -96,8 +96,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (startResponse.status === 429) {
-      // User already has an active job — revert session status
+      // User already has an active job — revert session status and give back the
+      // attempt we charged above, since no new job was actually enqueued.
       await updateSessionProgress(sessionId, { status: "pending" }, supabase).catch(() => {});
+      try {
+        await supabase.rpc("decrement_user_attempts", { p_user_id: user.id });
+      } catch {
+        // Non-fatal — worst case the user's quota is off by one, not a broken request.
+      }
       const errorData = await startResponse.json().catch(() => ({}));
       return NextResponse.json(
         { error: errorData.detail || "You already have a job in progress. Please wait." },
@@ -122,6 +128,12 @@ export async function POST(request: NextRequest) {
     console.error("❌ Failed to enqueue processing:", errorMsg);
 
     await failSession(sessionId, errorMsg, "unknown", supabase).catch(() => {});
+    // No job was actually enqueued — give back the attempt we charged above.
+    try {
+      await supabase.rpc("decrement_user_attempts", { p_user_id: user.id });
+    } catch {
+      // Non-fatal — worst case the user's quota is off by one, not a broken request.
+    }
     return NextResponse.json({ error: errorMsg }, { status: 500 });
   }
 }

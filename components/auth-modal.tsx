@@ -18,15 +18,44 @@ interface AuthModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type Mode = "signin" | "signup" | "forgot";
+
 export function AuthModal({ open, onOpenChange }: AuthModalProps) {
-  const { signIn, signUp } = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const { signIn, signUp, resetPasswordForEmail } = useAuth();
+  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const isSignUp = mode === "signup";
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
+
+    if (!email) {
+      setError("Please enter your email");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await resetPasswordForEmail(email);
+      if (error) {
+        setError(error.message);
+      } else {
+        setSuccessMessage("If an account exists for that email, we've sent a password reset link.");
+        setEmail("");
+      }
+    } catch {
+      setError("An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,22 +82,20 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password);
+        const { error, needsEmailConfirmation } = await signUp(email, password);
         if (error) {
           setError(error.message);
-        } else {
+        } else if (needsEmailConfirmation) {
           setSuccessMessage(
-            "Account created! You can now sign in."
+            "Account created! Check your email to confirm your address before signing in."
           );
-          // Clear form
           setEmail("");
           setPassword("");
           setConfirmPassword("");
-          // Auto-close after 2 seconds
-          setTimeout(() => {
-            onOpenChange(false);
-            setSuccessMessage(null);
-          }, 2000);
+        } else {
+          // No confirmation needed — Supabase already returned a session, and
+          // onAuthStateChange picks it up. Just close like a normal sign-in.
+          onOpenChange(false);
         }
       } else {
         const { error } = await signIn(email, password);
@@ -86,11 +113,70 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
     }
   };
 
-  const toggleMode = () => {
-    setIsSignUp(!isSignUp);
+  const switchMode = (next: Mode) => {
+    setMode(next);
     setError(null);
     setSuccessMessage(null);
+    setPassword("");
+    setConfirmPassword("");
   };
+
+  if (mode === "forgot") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reset your password</DialogTitle>
+            <DialogDescription>
+              Enter your email and we&apos;ll send you a link to reset your password.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="forgot-email">Email</Label>
+              <Input
+                id="forgot-email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="text-sm text-red-500 bg-red-50 p-3 rounded">
+                {error}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="text-sm text-green-600 bg-green-50 p-3 rounded">
+                {successMessage}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Sending..." : "Send reset link"}
+            </Button>
+
+            <div className="text-center text-sm">
+              <button
+                type="button"
+                onClick={() => switchMode("signin")}
+                className="text-primary hover:underline"
+                disabled={loading}
+              >
+                Back to sign in
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,7 +205,19 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              {!isSignUp && (
+                <button
+                  type="button"
+                  onClick={() => switchMode("forgot")}
+                  className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                  disabled={loading}
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
             <Input
               id="password"
               type="password"
@@ -165,7 +263,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           <div className="text-center text-sm">
             <button
               type="button"
-              onClick={toggleMode}
+              onClick={() => switchMode(isSignUp ? "signin" : "signup")}
               className="text-primary hover:underline"
               disabled={loading}
             >

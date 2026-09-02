@@ -10,6 +10,7 @@ import { ButtonWithProgress } from "@/components/button-with-progress";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Sparkles, AlertCircle, Upload, Mic, Scissors, Clapperboard, ArrowRight, Youtube, Link } from "lucide-react";
 import Image from "next/image";
+import NextLink from "next/link";
 import { RenderedVideo } from "@/lib/types";
 import { createSession } from "@/lib/session";
 import { useAuth } from "@/contexts/auth-context";
@@ -21,6 +22,7 @@ type WorkflowStage = "transcribe" | "identifyClips" | "detectFocus" | "render" |
 type InputMode = "file" | "youtube";
 
 const YOUTUBE_PATTERN = /(youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/live\/)/;
+const MAX_UPLOAD_SIZE_BYTES = 2048 * 1024 * 1024; // 2 GB — mirrors the server-side cap in app/api/upload/generate-url
 
 function HomeContent() {
   const { user, loading: authLoading } = useAuth();
@@ -83,6 +85,12 @@ function HomeContent() {
     setUploadProgress(0);
     setUploadStatus("idle");
 
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      const limitGb = (MAX_UPLOAD_SIZE_BYTES / (1024 * 1024 * 1024)).toFixed(0);
+      setError(`File is too large (${(file.size / (1024 * 1024 * 1024)).toFixed(1)} GB). Maximum upload size is ${limitGb} GB.`);
+      return;
+    }
+
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
     video.preload = "metadata";
@@ -126,6 +134,7 @@ function HomeContent() {
         body: JSON.stringify({
           fileName: selectedFile.name,
           fileType: selectedFile.type,
+          fileSize: selectedFile.size,
         }),
       });
 
@@ -571,6 +580,11 @@ function HomeContent() {
         <div className="container mx-auto px-4 max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <Image src="/logo.svg" alt="AM Logo" width={40} height={26} />
           <p>© {new Date().getFullYear()} ClipAI. All rights reserved.</p>
+          <div className="flex gap-4">
+            <NextLink href="/terms" className="hover:text-foreground">Terms</NextLink>
+            <NextLink href="/privacy" className="hover:text-foreground">Privacy</NextLink>
+            <NextLink href="/refund" className="hover:text-foreground">Refunds</NextLink>
+          </div>
         </div>
       </footer>
     </div>

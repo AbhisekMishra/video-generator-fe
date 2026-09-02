@@ -47,7 +47,11 @@ export async function POST(request: NextRequest) {
           console.error(`❌ Lemon Squeezy webhook: unrecognized variant_id ${attributes.variant_id}`);
           break;
         }
-        const isActive = ["active", "on_trial", "past_due"].includes(attributes.status);
+        // "cancelled" means the subscription won't renew, not that access ends now —
+        // the customer already paid for the current period and keeps it until Lemon
+        // Squeezy fires subscription_expired at period end. Downgrading here would
+        // revoke a paying customer's access the instant they click cancel.
+        const isActive = ["active", "on_trial", "past_due", "cancelled"].includes(attributes.status);
         await supabase
           .from("user_quotas")
           .update({
@@ -56,7 +60,7 @@ export async function POST(request: NextRequest) {
             lemonsqueezy_customer_id: attributes.customer_id != null ? String(attributes.customer_id) : null,
             lemonsqueezy_subscription_id: subscriptionId,
             subscription_status: attributes.status,
-            current_period_end: attributes.renews_at ?? null,
+            current_period_end: attributes.renews_at ?? attributes.ends_at ?? null,
           })
           .eq("user_id", userId);
         break;
@@ -71,14 +75,27 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case "subscription_cancelled":
+      case "subscription_cancelled": {
+        // Not a downgrade — just record the status (and the date access actually ends)
+        // so the UI can show "cancels on X". The real downgrade happens on
+        // subscription_expired, which Lemon Squeezy fires at the end of the paid period.
+        await supabase
+          .from("user_quotas")
+          .update({
+            subscription_status: "cancelled",
+            current_period_end: attributes.ends_at ?? attributes.renews_at ?? null,
+          })
+          .eq("user_id", userId);
+        break;
+      }
+
       case "subscription_expired": {
         await supabase
           .from("user_quotas")
           .update({
             plan_tier: "free",
             attempts_limit: 3,
-            subscription_status: attributes.status,
+            subscription_status: "expired",
           })
           .eq("user_id", userId);
         break;
